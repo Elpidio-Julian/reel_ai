@@ -5,7 +5,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'dart:async';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
 import '../preview/video_preview_screen.dart';
+import '../preview/video_trimmer_screen.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -261,24 +263,18 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
 
   Future<String> _getVideoSavePath() async {
     if (Platform.isAndroid) {
-      // Use the public Pictures directory on Android
-      final Directory? directory = await getExternalStorageDirectory();
-      if (directory == null) {
-        throw Exception('Could not access external storage');
+      // Use app's cache directory for temporary storage
+      final directory = await getTemporaryDirectory();
+      
+      // Create a videos subdirectory
+      final String videoDirectory = path.join(directory.path, 'Videos');
+      final dir = Directory(videoDirectory);
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
       }
-      
-      // Create a custom directory for our app's videos
-      final String videoDirectory = path.join(
-        directory.path,
-        'ReelAI',
-        'Videos'
-      );
-      
-      // Create the directory if it doesn't exist
-      await Directory(videoDirectory).create(recursive: true);
-      
+
       // Create a unique file name
-      final String fileName = 'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      final String fileName = 'ReelAI_${DateTime.now().millisecondsSinceEpoch}.mp4';
       return path.join(videoDirectory, fileName);
     } else {
       // For other platforms, use the documents directory
@@ -310,32 +306,50 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
           );
           
           if (result != null) {
-            // Move the temporary file to a permanent location
-            final String savePath = await _getVideoSavePath();
-            await File(result).copy(savePath);
-            await File(result).delete(); // Clean up the temporary file
-            
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Video saved to gallery'),
-                  action: SnackBarAction(
-                    label: 'View Location',
-                    onPressed: () {
-                      debugPrint('Video saved to: $savePath');
-                      // TODO: Open file location
-                    },
+            try {
+              // Get the path for saving
+              final String savePath = await _getVideoSavePath();
+              
+              // Copy to our temporary directory
+              await File(result).copy(savePath);
+              await File(result).delete().catchError((e) {
+                debugPrint('Error deleting temp file: $e');
+                return File(result); // Return the original file if deletion fails
+              });
+
+              // Use image_picker to pick the saved file, which will trigger media store scanning
+              final ImagePicker picker = ImagePicker();
+              await picker.pickVideo(source: ImageSource.gallery);
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Video saved to gallery'),
+                    duration: Duration(seconds: 2),
                   ),
-                ),
-              );
+                );
+              }
+            } catch (e) {
+              debugPrint('Error saving video: $e');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error saving video: $e'),
+                    backgroundColor: Colors.red,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
             }
           } else {
             // If user cancelled, delete the temporary file
-            await File(file.path).delete().catchError((e) => debugPrint('Error deleting temp file: $e'));
+            await File(file.path).delete().catchError((e) {
+              debugPrint('Error deleting temp file: $e');
+              return File(file.path); // Return the original file if deletion fails
+            });
           }
         }
       } else {
-        final String filePath = await _getVideoSavePath();
         await _controller!.startVideoRecording();
         setState(() => _isRecording = true);
         _startRecordingTimer();
@@ -347,6 +361,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error recording video: $e'),
+            backgroundColor: Colors.red,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -441,22 +456,110 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     try {
       final XFile? video = await picker.pickVideo(
         source: ImageSource.gallery,
-        maxDuration: const Duration(minutes: 3),
       );
       
       if (video != null && mounted) {
-        final String? result = await Navigator.push<String>(
-          context,
-          MaterialPageRoute(
-            builder: (context) => VideoPreviewScreen(
-              videoPath: video.path,
+        // Check video duration
+        final VideoPlayerController controller = VideoPlayerController.file(File(video.path));
+        await controller.initialize();
+        final Duration duration = controller.value.duration;
+        await controller.dispose();
+
+        if (duration > _maxRecordingDuration) {
+          // Show trimmer for long videos
+          if (mounted) {
+            final String? trimmedPath = await Navigator.push<String>(
+              context,
+              MaterialPageRoute(
+                builder: (context) => VideoTrimmerScreen(
+                  videoPath: video.path,
+                  maxDuration: _maxRecordingDuration,
+                ),
+              ),
+            );
+
+            if (trimmedPath != null && mounted) {
+              // Preview the selected video segment
+              final String? result = await Navigator.push<String>(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => VideoPreviewScreen(
+                    videoPath: trimmedPath,
+                  ),
+                ),
+              );
+
+              if (result != null && mounted) {
+                // Save the video to gallery
+                try {
+                  final String savePath = await _getVideoSavePath();
+                  await File(result).copy(savePath);
+                  await File(result).delete().catchError((e) {
+                    debugPrint('Error deleting temp file: $e');
+                    return File(result); // Return the original file if deletion fails
+                  });
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Video saved successfully'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                } catch (e) {
+                  debugPrint('Error saving video: $e');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error saving video: $e'),
+                        backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          // Video is within duration limit, show preview directly
+          final String? result = await Navigator.push<String>(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VideoPreviewScreen(
+                videoPath: video.path,
+              ),
             ),
-          ),
-        );
-        
-        if (result != null && mounted) {
-          // TODO: Handle selected video
-          debugPrint('Video selected and confirmed: $result');
+          );
+          
+          if (result != null && mounted) {
+            // Save the video to gallery
+            try {
+              final String savePath = await _getVideoSavePath();
+              await File(result).copy(savePath);
+              await File(result).delete().catchError((e) {
+                debugPrint('Error deleting temp file: $e');
+                return File(result); // Return the original file if deletion fails
+              });
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Video saved successfully'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            } catch (e) {
+              debugPrint('Error saving video: $e');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error saving video: $e'),
+                    backgroundColor: Colors.red,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            }
+          }
         }
       }
     } catch (e) {
@@ -517,39 +620,50 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
       );
     }
 
+    final size = MediaQuery.of(context).size;
+    final deviceRatio = size.width / size.height;
+    final scale = _controller!.value.aspectRatio / deviceRatio;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Stack(
+          fit: StackFit.expand,
           children: [
-            GestureDetector(
-              onTapDown: _handleTapToFocus,
-              onScaleStart: _handleScaleStart,
-              onScaleUpdate: _handleScaleUpdate,
-              child: Center(
-                child: CameraPreview(
-                  _controller!,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Focus indicator
-                      if (_focusPoint != null)
-                        Positioned(
-                          left: _focusPoint!.dx - 20,
-                          top: _focusPoint!.dy - 20,
-                          child: Container(
-                            height: 40,
-                            width: 40,
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: Colors.white,
-                                width: 2,
+            Center(
+              child: Transform.scale(
+                scale: isLandscape ? 1 : scale,
+                child: AspectRatio(
+                  aspectRatio: _controller!.value.aspectRatio,
+                  child: GestureDetector(
+                    onTapDown: _handleTapToFocus,
+                    onScaleStart: _handleScaleStart,
+                    onScaleUpdate: _handleScaleUpdate,
+                    child: CameraPreview(
+                      _controller!,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          if (_focusPoint != null)
+                            Positioned(
+                              left: _focusPoint!.dx - 20,
+                              top: _focusPoint!.dy - 20,
+                              child: Container(
+                                height: 40,
+                                width: 40,
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                  shape: BoxShape.circle,
+                                ),
                               ),
-                              shape: BoxShape.circle,
                             ),
-                          ),
-                        ),
-                    ],
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
