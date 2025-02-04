@@ -9,8 +9,8 @@ plugins {
 
 android {
     namespace = "com.example.reel_ai_app"
-    compileSdkVersion 33
-    ndkVersion = flutter.ndkVersion
+    compileSdkVersion 34
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
