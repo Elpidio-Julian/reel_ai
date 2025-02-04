@@ -8,6 +8,20 @@ plugins {
 
 
 android {
+    def keystoreProperties = new Properties()
+    def keystorePropertiesFile = file('key.properties')
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    }
+    
+    signingConfigs {
+        release {
+            storeFile = file(keystoreProperties.getProperty('storeFile'))
+            storePassword = keystoreProperties.getProperty('storePassword')
+            keyAlias = keystoreProperties.getProperty('keyAlias')
+            keyPassword = keystoreProperties.getProperty('keyPassword')
+        }
+    }
     namespace = "com.example.reel_ai_app"
     compileSdkVersion 34
     ndkVersion = "27.0.12077973"
@@ -34,12 +48,11 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
+    
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            signingConfig signingConfigs.release
         }
     }
 }

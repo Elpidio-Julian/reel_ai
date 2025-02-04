@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import '../models/user.dart';
 import '../repositories/user_repository.dart';
 import '../utils/exceptions.dart';
+import 'package:flutter/foundation.dart';
 
 class FirebaseService {
   final firebase_auth.FirebaseAuth _auth;
@@ -11,7 +12,13 @@ class FirebaseService {
     firebase_auth.FirebaseAuth? auth,
     UserRepository? userRepository,
   }) : _auth = auth ?? firebase_auth.FirebaseAuth.instance,
-       _userRepository = userRepository ?? UserRepository();
+       _userRepository = userRepository ?? UserRepository() {
+    // Configure persistence for web platform
+    if (kIsWeb) {
+      _auth.setPersistence(firebase_auth.Persistence.LOCAL);
+      _auth.setSettings(appVerificationDisabledForTesting: true);
+    }
+  }
 
   // Get current user
   User? get currentUser {
@@ -93,5 +100,30 @@ class FirebaseService {
         return User.fromFirebaseUser(firebaseUser);
       }
     });
+  }
+
+  String getAuthErrorMessage(String code) {
+    switch (code) {
+      case 'user-not-found':
+        return 'No user found with this email.';
+      case 'wrong-password':
+        return 'Wrong password provided.';
+      case 'email-already-in-use':
+        return 'An account already exists with this email.';
+      case 'invalid-email':
+        return 'Invalid email address.';
+      case 'weak-password':
+        return 'The password provided is too weak.';
+      case 'operation-not-allowed':
+        return 'This sign in method is not enabled.';
+      case 'user-disabled':
+        return 'This user account has been disabled.';
+      case 'too-many-requests':
+        return 'Too many attempts. Please try again later.';
+      case 'network-request-failed':
+        return 'A network error occurred. Please check your connection.';
+      default:
+        return 'An unexpected authentication error occurred.';
+    }
   }
 } 
