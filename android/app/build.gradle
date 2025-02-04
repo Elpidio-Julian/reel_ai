@@ -9,7 +9,7 @@ plugins {
 
 android {
     namespace = "com.example.reel_ai_app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdkVersion 33
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -19,8 +19,9 @@ android {
 
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_1_8
-        languageVersion = "2.0"
-        apiVersion = "2.0"
+        languageVersion = "1.8"
+        apiVersion = "1.8"
+        freeCompilerArgs += ["-Xskip-metadata-version-check"]
     }
 
     defaultConfig {
