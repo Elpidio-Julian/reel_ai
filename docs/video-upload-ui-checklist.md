@@ -20,18 +20,18 @@
 
 ## 3. Camera Implementation
 - [x ] Create CameraController
-- [ x] Setup basic camera preview
-- [ ] Implement camera controls
-  - [ ] Camera switching (front/back)
-  - [ ] Flash control
-  - [ ] Focus control
-  - [ ] Zoom functionality
-- [ ] Add recording controls
-  - [ ] Start/stop recording
-  - [ ] Recording duration limit
-  - [ ] Recording progress indicator
-- [ ] Handle camera initialization errors
-- [ ] Implement proper camera lifecycle management
+- [x] Setup basic camera preview
+- [x] Implement camera controls
+  - [x] Camera switching (front/back)
+  - [x] Flash control
+  - [x] Focus control
+  - [x] Zoom functionality
+- [ x] Add recording controls
+  - [x ] Start/stop recording
+  - [x ] Recording duration limit
+  - [x ] Recording progress indicator
+- [x ] Handle camera initialization errors
+- [x ] Implement proper camera lifecycle management
 
 ## 4. Gallery Selection
 - [ ] Implement video picker from gallery

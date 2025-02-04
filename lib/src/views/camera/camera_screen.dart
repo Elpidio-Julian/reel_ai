@@ -3,6 +3,9 @@ import 'package:camera/camera.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'dart:async';
+import 'package:image_picker/image_picker.dart';
+import '../preview/video_preview_screen.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -26,6 +29,11 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
   String? _errorMessage;
   bool _isDisposed = false;
 
+  // Add recording timer variables
+  static const Duration _maxRecordingDuration = Duration(minutes: 3);
+  Duration _recordingDuration = Duration.zero;
+  Timer? _recordingTimer;
+
   @override
   void initState() {
     super.initState();
@@ -35,6 +43,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
 
   @override
   void dispose() {
+    _recordingTimer?.cancel();
     _isDisposed = true;
     _disposeCamera();
     WidgetsBinding.instance.removeObserver(this);
@@ -221,37 +230,127 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     }
   }
 
+  void _startRecordingTimer() {
+    _recordingTimer?.cancel();
+    _recordingDuration = Duration.zero;
+    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_recordingDuration >= _maxRecordingDuration) {
+        _toggleRecording();
+        return;
+      }
+      setState(() {
+        _recordingDuration += const Duration(seconds: 1);
+      });
+    });
+  }
+
+  void _stopRecordingTimer() {
+    _recordingTimer?.cancel();
+    _recordingTimer = null;
+    setState(() {
+      _recordingDuration = Duration.zero;
+    });
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return "$minutes:$seconds";
+  }
+
+  Future<String> _getVideoSavePath() async {
+    if (Platform.isAndroid) {
+      // Use the public Pictures directory on Android
+      final Directory? directory = await getExternalStorageDirectory();
+      if (directory == null) {
+        throw Exception('Could not access external storage');
+      }
+      
+      // Create a custom directory for our app's videos
+      final String videoDirectory = path.join(
+        directory.path,
+        'ReelAI',
+        'Videos'
+      );
+      
+      // Create the directory if it doesn't exist
+      await Directory(videoDirectory).create(recursive: true);
+      
+      // Create a unique file name
+      final String fileName = 'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      return path.join(videoDirectory, fileName);
+    } else {
+      // For other platforms, use the documents directory
+      final Directory appDir = await getApplicationDocumentsDirectory();
+      final String videoDirectory = path.join(appDir.path, 'Videos');
+      await Directory(videoDirectory).create(recursive: true);
+      final String fileName = 'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      return path.join(videoDirectory, fileName);
+    }
+  }
+
   Future<void> _toggleRecording() async {
     if (_controller == null) return;
 
     try {
       if (_isRecording) {
+        _stopRecordingTimer();
         final file = await _controller!.stopVideoRecording();
         setState(() => _isRecording = false);
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Video saved to: ${file.path}'),
-              duration: const Duration(seconds: 2),
+          final String? result = await Navigator.push<String>(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VideoPreviewScreen(
+                videoPath: file.path,
+              ),
             ),
           );
+          
+          if (result != null) {
+            // Move the temporary file to a permanent location
+            final String savePath = await _getVideoSavePath();
+            await File(result).copy(savePath);
+            await File(result).delete(); // Clean up the temporary file
+            
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Video saved to gallery'),
+                  action: SnackBarAction(
+                    label: 'View Location',
+                    onPressed: () {
+                      debugPrint('Video saved to: $savePath');
+                      // TODO: Open file location
+                    },
+                  ),
+                ),
+              );
+            }
+          } else {
+            // If user cancelled, delete the temporary file
+            await File(file.path).delete().catchError((e) => debugPrint('Error deleting temp file: $e'));
+          }
         }
       } else {
-        // Create a directory for videos if it doesn't exist
-        final Directory appDir = await getApplicationDocumentsDirectory();
-        final String videoDirectory = '${appDir.path}/Videos';
-        await Directory(videoDirectory).create(recursive: true);
-
-        // Create a unique file name
-        final String fileName = 'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
-        final String filePath = path.join(videoDirectory, fileName);
-
+        final String filePath = await _getVideoSavePath();
         await _controller!.startVideoRecording();
         setState(() => _isRecording = true);
+        _startRecordingTimer();
       }
     } catch (e) {
       debugPrint('Error recording video: $e');
+      _stopRecordingTimer();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error recording video: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
@@ -334,6 +433,41 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
         return Icons.flash_on;
       case FlashMode.torch:
         return Icons.highlight;
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? video = await picker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(minutes: 3),
+      );
+      
+      if (video != null && mounted) {
+        final String? result = await Navigator.push<String>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VideoPreviewScreen(
+              videoPath: video.path,
+            ),
+          ),
+        );
+        
+        if (result != null && mounted) {
+          // TODO: Handle selected video
+          debugPrint('Video selected and confirmed: $result');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking video: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
@@ -438,7 +572,42 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
               ),
             ),
 
-            // Existing camera controls
+            // Recording duration indicator
+            if (_isRecording)
+              Positioned(
+                top: 20,
+                left: 20,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _formatDuration(_recordingDuration),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // Camera controls with recording progress
             Positioned(
               left: 0,
               right: 0,
@@ -450,24 +619,45 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.flip_camera_ios),
+                      icon: const Icon(Icons.photo_library),
                       color: Colors.white,
-                      onPressed: _cameras.length < 2 ? null : _switchCamera,
+                      onPressed: _isRecording ? null : _pickFromGallery,
                     ),
                     
                     IconButton(
-                      icon: Icon(
-                        _isRecording ? Icons.stop : Icons.fiber_manual_record,
-                        size: 50,
-                      ),
-                      color: _isRecording ? Colors.red : Colors.white,
-                      onPressed: _toggleRecording,
+                      icon: const Icon(Icons.flip_camera_ios),
+                      color: Colors.white,
+                      onPressed: _isRecording ? null : (_cameras.length < 2 ? null : _switchCamera),
+                    ),
+                    
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        if (_isRecording)
+                          SizedBox(
+                            width: 70,
+                            height: 70,
+                            child: CircularProgressIndicator(
+                              value: _recordingDuration.inSeconds / _maxRecordingDuration.inSeconds,
+                              color: Colors.red,
+                              backgroundColor: Colors.red.withOpacity(0.2),
+                            ),
+                          ),
+                        IconButton(
+                          icon: Icon(
+                            _isRecording ? Icons.stop : Icons.fiber_manual_record,
+                            size: 50,
+                          ),
+                          color: _isRecording ? Colors.red : Colors.white,
+                          onPressed: _toggleRecording,
+                        ),
+                      ],
                     ),
                     
                     IconButton(
                       icon: Icon(_getFlashIcon()),
                       color: Colors.white,
-                      onPressed: _toggleFlash,
+                      onPressed: _isRecording ? null : _toggleFlash,
                     ),
                   ],
                 ),

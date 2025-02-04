@@ -9,10 +9,19 @@ import 'src/views/home/home_screen.dart';
 import 'src/views/test/permission_test_screen.dart';
 import 'src/views/camera/camera_screen.dart';
 import 'firebase_options.dart';
+import 'src/config/env_config.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  
+  // Load environment variables
+  await EnvConfig.load();
+  
+  // Initialize Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
   runApp(const MyApp());
 }
 
