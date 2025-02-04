@@ -16,6 +16,8 @@ We are building a TikTok clone MVP with an AI-first approach for Android using F
 │   ├── src/
 │   │   ├── models/       # Data models (e.g., Video, User)
 │   │   ├── providers/    # State management using Provider
+│   │   ├── repositories/ # Data access layer for external services
+│   │   │   └── user_repository.dart  # Handles user data operations in Firestore
 │   │   ├── services/     # External integrations and business logic
 │   │   │   ├── firebase_service.dart      # Firebase integration for Auth, Firestore, Storage
 │   │   │   ├── aws_openshot_service.dart    # Handles AWS Openshot API calls
@@ -23,6 +25,7 @@ We are building a TikTok clone MVP with an AI-first approach for Android using F
 │   │   ├── views/        # UI screens and pages
 │   │   ├── widgets/      # Reusable UI components
 │   │   ├── utils/        # Utility classes, constants, and helper functions
+│   │   │   └── exceptions.dart # Custom exceptions and error handling
 │   │   └── metrics/      # Metrics recording module for analytics and event logging
 │   │         ├── metrics_service.dart    # Logs events (uploads, errors, performance metrics)
 │   │         ├── metrics_model.dart      # Defines structure for metrics events
@@ -53,7 +56,13 @@ Our architecture aligns with the C4 model, which helps us create multiple layers
      - **AWS Openshot Service:** Handles communication with the AWS Openshot API for video processing.
      - **VideoProcessingFacade:** Provides a unified interface that wraps interactions with external services, centralizing error handling and logging (including metrics events).
 
-4. **Metrics Module**
+4. **Repository Layer**
+   - Abstracts data access operations from the rest of the application.
+   - Provides a clean API for data operations (create, read, update, delete).
+   - Handles data persistence and retrieval from Firestore.
+   - Makes it easier to modify the underlying data source without affecting the rest of the app.
+
+5. **Metrics Module**
    - Dedicated to recording comprehensive metrics for analytics and performance monitoring using an event-driven approach.
 
 ### System Diagrams (Mermaid)
@@ -61,31 +70,32 @@ Our architecture aligns with the C4 model, which helps us create multiple layers
 #### System Context Diagram
 ```mermaid
 flowchart LR
-    User[User]
-    MobileApp[Mobile App (Flutter)]
-    Firebase[Firebase Services]
-    AWS[AWS Openshot API]
-    MobileApp --> Firebase
-    MobileApp --> AWS
+    user["User"]
+    mobileApp["Mobile App (Flutter)"]
+    firebase["Firebase Services"]
+    aws["AWS Openshot API"]
+    mobileApp --> firebase
+    mobileApp --> aws
 ```
 
 #### Container Diagram
 ```mermaid
 flowchart TD
-    A[Mobile App] -->|Uses| B[Firebase Services]
-    A -->|Calls| C[AWS Openshot API]
-    B --> D[Authentication]
-    B --> E[Firestore]
-    B --> F[Storage]
+    app["Mobile App"] -->|Uses| firebase["Firebase Services"]
+    app -->|Calls| aws["AWS Openshot API"]
+    firebase --> auth["Authentication"]
+    firebase --> firestore["Firestore"]
+    firebase --> storage["Storage"]
 ```
 
 #### Component Diagram (Example for Mobile App)
 ```mermaid
 flowchart LR
-    Main[main.dart] --> Providers[Providers]
-    Main --> Views[Views]
-    Providers --> Services[Services]
-    Providers --> Metrics[Metrics Module]
+    main["main.dart"] --> providers["Providers"]
+    main --> views["Views"]
+    providers --> services["Services"]
+    services --> repositories["Repositories"]
+    providers --> metrics["Metrics Module"]
 ```
 
 ### Video Upload to Publishing Pipeline
@@ -99,6 +109,7 @@ flowchart LR
 
 ### Reducing Integration Complexity
 
+- **Repository Pattern:** Abstracts data access operations, making it easier to modify data sources.
 - **Facade Pattern:** Centralizes external service calls to reduce integration complexity.
 - **Metrics Module:** Decouples analytics from core business logic, supporting easy future upgrades.
 - **Event-Driven Architecture:** Enables decoupled logging of significant events, facilitating maintenance and scalability.
