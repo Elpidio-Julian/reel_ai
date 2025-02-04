@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'src/providers/auth_provider.dart';
-import 'src/utils/routes.dart';
+import 'src/routes.dart';
 import 'src/views/auth/login_screen.dart';
 import 'src/views/auth/register_screen.dart';
 import 'src/views/home/home_screen.dart';
+import 'src/views/test/permission_test_screen.dart';
+import 'src/views/camera/camera_screen.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -29,11 +31,13 @@ class MyApp extends StatelessWidget {
           primarySwatch: Colors.blue,
           useMaterial3: true,
         ),
-        initialRoute: Routes.login,
+        initialRoute: Routes.permissionTest,
         routes: {
           Routes.login: (context) => const LoginScreen(),
           Routes.register: (context) => const RegisterScreen(),
           Routes.home: (context) => const HomeScreen(),
+          Routes.permissionTest: (context) => const PermissionTestScreen(),
+          Routes.camera: (context) => const CameraScreen(),
         },
       ),
     );
