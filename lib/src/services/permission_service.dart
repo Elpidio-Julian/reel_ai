@@ -109,4 +109,39 @@ class PermissionService {
   static Future<bool> openSettings() {
     return openAppSettings();
   }
+
+  Future<bool> requestCameraPermissions() async {
+    final camera = await Permission.camera.request();
+    final microphone = await Permission.microphone.request();
+    return camera.isGranted && microphone.isGranted;
+  }
+
+  Future<bool> requestStoragePermissions() async {
+    if (await Permission.storage.request().isGranted) {
+      return true;
+    }
+    
+    // For Android 10 and above
+    if (await Permission.manageExternalStorage.request().isGranted) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  Future<bool> checkCameraPermissions() async {
+    final camera = await Permission.camera.status;
+    final microphone = await Permission.microphone.status;
+    return camera.isGranted && microphone.isGranted;
+  }
+
+  Future<bool> checkStoragePermissions() async {
+    final storage = await Permission.storage.status;
+    final manageStorage = await Permission.manageExternalStorage.status;
+    return storage.isGranted || manageStorage.isGranted;
+  }
+
+  Future<void> openPermissionSettings() async {
+    await openAppSettings();
+  }
 } 

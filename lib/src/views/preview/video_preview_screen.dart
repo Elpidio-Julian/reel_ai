@@ -172,7 +172,7 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
                     icon: Icon(
                       _isPlaying ? Icons.pause_circle : Icons.play_circle,
                       size: 64,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withAlpha((0.7 * 255).round()),
                     ),
                     onPressed: _togglePlayPause,
                   ),

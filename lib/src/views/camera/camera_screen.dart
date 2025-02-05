@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as path;
 import 'dart:async';
+import 'dart:io';
+import 'package:camera/camera.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import '../preview/video_preview_screen.dart';
 import '../preview/video_trimmer_screen.dart';
+import '../../services/camera_service.dart';
+import '../../services/video_storage_service.dart';
+import '../../services/recording_timer_service.dart';
 
 class CameraScreen extends StatefulWidget {
   const CameraScreen({super.key});
@@ -17,197 +18,263 @@ class CameraScreen extends StatefulWidget {
 }
 
 class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver {
-  CameraController? _controller;
-  bool _isInitialized = false;
-  bool _isRecording = false;
-  ResolutionPreset _resolution = ResolutionPreset.medium;
-  FlashMode _flashMode = FlashMode.off;
-  List<CameraDescription> _cameras = [];
-  int _selectedCameraIndex = 0;
-  double _minZoomLevel = 1.0;
-  double _maxZoomLevel = 1.0;
-  double _currentZoomLevel = 1.0;
-  double _baseScaleFactor = 1.0;
+  CameraService? _cameraService;
+  VideoStorageService? _storageService;
+  RecordingTimerService? _timerService;
   String? _errorMessage;
   bool _isDisposed = false;
-
-  // Add recording timer variables
-  static const Duration _maxRecordingDuration = Duration(minutes: 3);
-  Duration _recordingDuration = Duration.zero;
-  Timer? _recordingTimer;
+  Offset? _focusPoint;
+  double _baseScaleFactor = 1.0;
+  Future<void>? _initializationFuture;
 
   @override
   void initState() {
     super.initState();
+    _isDisposed = false;
     WidgetsBinding.instance.addObserver(this);
-    _initializeCamera();
+    _initializationFuture = _initializeServices();
   }
 
-  @override
-  void dispose() {
-    _recordingTimer?.cancel();
-    _isDisposed = true;
-    _disposeCamera();
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
+  Future<void> _initializeServices() async {
+    if (_isDisposed) return;
 
-  Future<void> _disposeCamera() async {
     try {
-      final CameraController? controller = _controller;
-      if (controller != null && controller.value.isInitialized) {
-        await controller.dispose();
-      }
+      // Create services
+      _storageService = VideoStorageService();
+      _timerService = RecordingTimerService(
+        maxDuration: const Duration(minutes: 3),
+        onMaxDurationReached: _handleMaxDurationReached,
+      );
+      _cameraService = CameraService();
+
+      // Initialize camera last
+      await _cameraService?.initialize();
     } catch (e) {
-      debugPrint('Error disposing camera: $e');
+      await _disposeResources();
+      throw Exception('Failed to initialize camera: $e');
+    }
+  }
+
+  Future<void> _disposeResources() async {
+    try {
+      // Stop recording if active
+      if (_cameraService?.isRecording == true) {
+        await _cameraService?.stopRecording();
+      }
+
+      // Dispose in reverse order of initialization
+      await _cameraService?.dispose();
+      _timerService?.dispose();
+      
+      _cameraService = null;
+      _timerService = null;
+      _storageService = null;
+    } catch (e) {
+      debugPrint('Error disposing resources: $e');
     }
   }
 
   @override
+  void dispose() {
+    _isDisposed = true;
+    WidgetsBinding.instance.removeObserver(this);
+    _disposeResources();
+    super.dispose();
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Don't do anything if we haven't initialized yet
-    if (!mounted) return;
+    if (_isDisposed) return;
 
     switch (state) {
       case AppLifecycleState.inactive:
       case AppLifecycleState.paused:
-        _disposeCamera();
+        _disposeResources();
         break;
       case AppLifecycleState.resumed:
-        _initializeCamera();
+        if (_cameraService?.isInitialized != true) {
+          _initializationFuture = _initializeServices();
+          setState(() {}); // Trigger rebuild with new future
+        }
         break;
       default:
         break;
     }
   }
 
-  Future<void> _initializeCamera() async {
-    try {
-      _cameras = await availableCameras();
-      if (_cameras.isEmpty) {
-        _setErrorState('No cameras available on this device');
-        return;
-      }
-      await _setupCamera(_selectedCameraIndex);
-    } catch (e) {
-      _setErrorState('Failed to initialize camera: $e');
+  bool get _isReady => 
+    _cameraService != null && 
+    _cameraService!.isInitialized && 
+    _cameraService!.controller != null;
+
+  // Update all service calls to use null-safe access
+  void _handleMaxDurationReached() {
+    if (!_isDisposed && _isReady) {
+      _toggleRecording();
     }
   }
 
-  void _setErrorState(String message) {
-    if (!_isDisposed && mounted) {
-      setState(() {
-        _errorMessage = message;
-        _isInitialized = false;
-      });
-    }
-  }
-
-  Future<void> _setupCamera(int index) async {
-    if (_cameras.isEmpty) return;
-
-    // Set state to loading
-    if (mounted) {
-      setState(() {
-        _isInitialized = false;
-        _errorMessage = null;
-      });
-    }
-
-    // Safely dispose previous controller
-    await _disposeCamera();
+  Future<void> _toggleRecording() async {
+    if (!_isReady) return;
 
     try {
-      final controller = CameraController(
-        _cameras[index],
-        _resolution,
-        enableAudio: true,
-        imageFormatGroup: Platform.isAndroid 
-          ? ImageFormatGroup.yuv420
-          : ImageFormatGroup.bgra8888,
-      );
-
-      // Store controller reference
-      _controller = controller;
-
-      // Initialize controller
-      await controller.initialize();
-      if (!mounted || _isDisposed) return;
-
-      // Configure camera settings
-      try {
-        await Future.wait([
-          controller.setFlashMode(_flashMode),
-          controller.setFocusMode(FocusMode.auto),
-        ]);
-      } catch (e) {
-        debugPrint('Warning: Could not set initial camera settings: $e');
-      }
-
-      // Get zoom range
-      try {
-        _minZoomLevel = await controller.getMinZoomLevel();
-        _maxZoomLevel = await controller.getMaxZoomLevel();
-        _currentZoomLevel = _minZoomLevel;
-      } catch (e) {
-        debugPrint('Warning: Could not get zoom levels: $e');
-        _minZoomLevel = 1.0;
-        _maxZoomLevel = 1.0;
-        _currentZoomLevel = 1.0;
-      }
-
-      if (!mounted || _isDisposed) return;
-      
-      setState(() {
-        _selectedCameraIndex = index;
-        _isInitialized = true;
-      });
-    } catch (e) {
-      if (e is CameraException) {
-        switch (e.code) {
-          case 'CameraAccessDenied':
-            _setErrorState('Camera access was denied');
-            break;
-          case 'CameraNotFound':
-            _setErrorState('Camera not found');
-            break;
-          default:
-            if (_resolution != ResolutionPreset.low) {
-              debugPrint('Retrying with lower resolution');
-              setState(() => _resolution = ResolutionPreset.low);
-              await _setupCamera(index);
-            } else {
-              _setErrorState('Failed to initialize camera: ${e.description}');
-            }
-        }
+      if (_cameraService!.isRecording) {
+        _timerService?.stop();
+        final String videoPath = await _cameraService!.stopRecording();
+        await _navigateToPreview(videoPath);
       } else {
-        _setErrorState('Failed to initialize camera: $e');
+        await _cameraService!.startRecording();
+        _timerService?.start();
+      }
+    } catch (e) {
+      _timerService?.stop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error recording video: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
       }
     }
   }
 
-  Future<void> _switchCamera() async {
-    if (_cameras.length < 2) return;
+  Future<void> _navigateToPreview(String videoPath) async {
+    // Properly dispose resources before navigation
+    await _disposeResources();
     
-    setState(() {
-      _isInitialized = false;
-      _errorMessage = null;
-    });
+    if (!mounted) return;
+
+    final String? result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => VideoPreviewScreen(
+          videoPath: videoPath,
+        ),
+      ),
+    );
+    
+    if (!mounted) return;
+
+    // Handle the result
+    if (result != null) {
+      await _handleVideoResult(result);
+    } else {
+      await _storageService?.deleteVideo(videoPath);
+    }
+
+    // Reinitialize camera after returning
+    if (mounted) {
+      await _initializeServices();
+    }
+  }
+
+  Future<void> _handleVideoResult(String videoPath) async {
+    if (!mounted) return;
     
     try {
-      final newIndex = (_selectedCameraIndex + 1) % _cameras.length;
-      await _setupCamera(newIndex);
+      final String savedPath = await _storageService?.saveVideo(videoPath) ?? '';
+      
+      if (savedPath.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Video saved successfully'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
-      _setErrorState('Failed to switch camera: $e');
+      debugPrint('Error saving video: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving video: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    await _disposeResources();
+    
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? video = await picker.pickVideo(
+        source: ImageSource.gallery,
+      );
+      
+      if (!mounted) return;
+      
+      if (video != null) {
+        final VideoPlayerController controller = VideoPlayerController.file(File(video.path));
+        await controller.initialize();
+        final Duration videoDuration = controller.value.duration;
+        await controller.dispose();
+
+        final maxDuration = _timerService?.maxDuration ?? const Duration(minutes: 3);
+        if (videoDuration.compareTo(maxDuration) > 0) {
+          if (!mounted) return;
+          
+          final String? trimmedPath = await Navigator.push<String>(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VideoTrimmerScreen(
+                videoPath: video.path,
+                maxDuration: maxDuration,
+              ),
+            ),
+          );
+
+          if (!mounted) return;
+
+          if (trimmedPath != null) {
+            await _handleVideoResult(trimmedPath);
+          }
+        } else {
+          await _handleVideoResult(video.path);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error picking video: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      // Reinitialize camera
+      if (mounted) {
+        await _initializeServices();
+      }
+    }
+  }
+
+  IconData _getFlashIcon() {
+    switch (_cameraService?.controller?.value.flashMode ?? FlashMode.off) {
+      case FlashMode.off:
+        return Icons.flash_off;
+      case FlashMode.auto:
+        return Icons.flash_auto;
+      case FlashMode.always:
+        return Icons.flash_on;
+      case FlashMode.torch:
+        return Icons.highlight;
     }
   }
 
   Future<void> _toggleFlash() async {
-    if (_controller == null) return;
+    if (!_isReady || !mounted) return;
 
     try {
+      final controller = _cameraService!.controller!;
       FlashMode newMode;
-      switch (_flashMode) {
+      switch (controller.value.flashMode) {
         case FlashMode.off:
           newMode = FlashMode.auto;
           break;
@@ -222,180 +289,47 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
           break;
       }
 
-      await _controller!.setFlashMode(newMode);
-      
-      setState(() {
-        _flashMode = newMode;
-      });
+      await controller.setFlashMode(newMode);
+      if (mounted) setState(() {});
     } catch (e) {
       debugPrint('Error toggling flash: $e');
     }
   }
 
-  void _startRecordingTimer() {
-    _recordingTimer?.cancel();
-    _recordingDuration = Duration.zero;
-    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_recordingDuration >= _maxRecordingDuration) {
-        _toggleRecording();
-        return;
-      }
-      setState(() {
-        _recordingDuration += const Duration(seconds: 1);
-      });
-    });
-  }
-
-  void _stopRecordingTimer() {
-    _recordingTimer?.cancel();
-    _recordingTimer = null;
-    setState(() {
-      _recordingDuration = Duration.zero;
-    });
-  }
-
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final minutes = twoDigits(duration.inMinutes.remainder(60));
-    final seconds = twoDigits(duration.inSeconds.remainder(60));
-    return "$minutes:$seconds";
-  }
-
-  Future<String> _getVideoSavePath() async {
-    if (Platform.isAndroid) {
-      // Use app's cache directory for temporary storage
-      final directory = await getTemporaryDirectory();
-      
-      // Create a videos subdirectory
-      final String videoDirectory = path.join(directory.path, 'Videos');
-      final dir = Directory(videoDirectory);
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
-
-      // Create a unique file name
-      final String fileName = 'ReelAI_${DateTime.now().millisecondsSinceEpoch}.mp4';
-      return path.join(videoDirectory, fileName);
-    } else {
-      // For other platforms, use the documents directory
-      final Directory appDir = await getApplicationDocumentsDirectory();
-      final String videoDirectory = path.join(appDir.path, 'Videos');
-      await Directory(videoDirectory).create(recursive: true);
-      final String fileName = 'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
-      return path.join(videoDirectory, fileName);
-    }
-  }
-
-  Future<void> _toggleRecording() async {
-    if (_controller == null) return;
-
-    try {
-      if (_isRecording) {
-        _stopRecordingTimer();
-        final file = await _controller!.stopVideoRecording();
-        setState(() => _isRecording = false);
-        
-        if (mounted) {
-          final String? result = await Navigator.push<String>(
-            context,
-            MaterialPageRoute(
-              builder: (context) => VideoPreviewScreen(
-                videoPath: file.path,
-              ),
-            ),
-          );
-          
-          if (result != null) {
-            try {
-              // Get the path for saving
-              final String savePath = await _getVideoSavePath();
-              
-              // Copy to our temporary directory
-              await File(result).copy(savePath);
-              await File(result).delete().catchError((e) {
-                debugPrint('Error deleting temp file: $e');
-                return File(result); // Return the original file if deletion fails
-              });
-
-              // Use image_picker to pick the saved file, which will trigger media store scanning
-              final ImagePicker picker = ImagePicker();
-              await picker.pickVideo(source: ImageSource.gallery);
-
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Video saved to gallery'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              }
-            } catch (e) {
-              debugPrint('Error saving video: $e');
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error saving video: $e'),
-                    backgroundColor: Colors.red,
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              }
-            }
-          } else {
-            // If user cancelled, delete the temporary file
-            await File(file.path).delete().catchError((e) {
-              debugPrint('Error deleting temp file: $e');
-              return File(file.path); // Return the original file if deletion fails
-            });
-          }
-        }
-      } else {
-        await _controller!.startVideoRecording();
-        setState(() => _isRecording = true);
-        _startRecordingTimer();
-      }
-    } catch (e) {
-      debugPrint('Error recording video: $e');
-      _stopRecordingTimer();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error recording video: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    }
+  Future<void> _switchCamera() async {
+    await _cameraService?.switchCamera();
+    if (mounted) setState(() {});
   }
 
   Future<void> _handleScaleUpdate(ScaleUpdateDetails details) async {
-    if (_controller == null) return;
+    if (!_isReady || !mounted) return;
 
     try {
-      // Calculate new zoom level
+      final controller = _cameraService!.controller!;
+      final minZoom = await controller.getMinZoomLevel();
+      final maxZoom = await controller.getMaxZoomLevel();
+      
       final double scale = (_baseScaleFactor * details.scale).clamp(
-        _minZoomLevel,
-        _maxZoomLevel,
+        minZoom,
+        maxZoom,
       );
 
-      if (scale != _currentZoomLevel) {
-        _currentZoomLevel = scale;
-        await _controller!.setZoomLevel(scale);
-      }
+      await controller.setZoomLevel(scale);
+      if (mounted) setState(() {});
     } catch (e) {
       debugPrint('Error updating zoom: $e');
     }
   }
 
   void _handleScaleStart(ScaleStartDetails details) {
-    _baseScaleFactor = _currentZoomLevel;
+    _baseScaleFactor = 1.0;
   }
 
   Future<void> _handleTapToFocus(TapDownDetails details) async {
-    if (_controller == null || !_controller!.value.isInitialized) return;
+    if (!_isReady || !mounted) return;
 
     try {
+      final controller = _cameraService!.controller!;
       final box = context.findRenderObject() as RenderBox;
       final point = box.globalToLocal(details.globalPosition);
       
@@ -404,14 +338,16 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
       final double y = point.dy / box.size.height;
 
       // Set focus point and mode
-      await _controller!.setFocusMode(FocusMode.locked);
-      await _controller!.setFocusPoint(Offset(x, y));
-      await _controller!.setFocusMode(FocusMode.auto);
+      await controller.setFocusMode(FocusMode.locked);
+      await controller.setFocusPoint(Offset(x, y));
+      await controller.setFocusMode(FocusMode.auto);
 
       // Show focus indicator
-      setState(() {
-        _focusPoint = point;
-      });
+      if (mounted) {
+        setState(() {
+          _focusPoint = point;
+        });
+      }
 
       // Hide focus indicator and reset to continuous auto focus after delay
       await Future.delayed(const Duration(seconds: 2));
@@ -420,7 +356,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
           _focusPoint = null;
         });
         // Reset to continuous auto focus
-        await _controller!.setFocusMode(FocusMode.auto);
+        await controller.setFocusMode(FocusMode.auto);
       }
     } catch (e) {
       debugPrint('Error setting focus: $e');
@@ -435,146 +371,15 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     }
   }
 
-  // Add focus point state
-  Offset? _focusPoint;
-
-  IconData _getFlashIcon() {
-    switch (_flashMode) {
-      case FlashMode.off:
-        return Icons.flash_off;
-      case FlashMode.auto:
-        return Icons.flash_auto;
-      case FlashMode.always:
-        return Icons.flash_on;
-      case FlashMode.torch:
-        return Icons.highlight;
-    }
+  String _formatDuration(Duration? duration) {
+    if (duration == null) return "00:00";
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return "$minutes:$seconds";
   }
 
-  Future<void> _pickFromGallery() async {
-    final ImagePicker picker = ImagePicker();
-    try {
-      final XFile? video = await picker.pickVideo(
-        source: ImageSource.gallery,
-      );
-      
-      if (video != null && mounted) {
-        // Check video duration
-        final VideoPlayerController controller = VideoPlayerController.file(File(video.path));
-        await controller.initialize();
-        final Duration duration = controller.value.duration;
-        await controller.dispose();
-
-        if (duration > _maxRecordingDuration) {
-          // Show trimmer for long videos
-          if (mounted) {
-            final String? trimmedPath = await Navigator.push<String>(
-              context,
-              MaterialPageRoute(
-                builder: (context) => VideoTrimmerScreen(
-                  videoPath: video.path,
-                  maxDuration: _maxRecordingDuration,
-                ),
-              ),
-            );
-
-            if (trimmedPath != null && mounted) {
-              // Preview the selected video segment
-              final String? result = await Navigator.push<String>(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => VideoPreviewScreen(
-                    videoPath: trimmedPath,
-                  ),
-                ),
-              );
-
-              if (result != null && mounted) {
-                // Save the video to gallery
-                try {
-                  final String savePath = await _getVideoSavePath();
-                  await File(result).copy(savePath);
-                  await File(result).delete().catchError((e) {
-                    debugPrint('Error deleting temp file: $e');
-                    return File(result); // Return the original file if deletion fails
-                  });
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Video saved successfully'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                } catch (e) {
-                  debugPrint('Error saving video: $e');
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error saving video: $e'),
-                        backgroundColor: Colors.red,
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  }
-                }
-              }
-            }
-          }
-        } else {
-          // Video is within duration limit, show preview directly
-          final String? result = await Navigator.push<String>(
-            context,
-            MaterialPageRoute(
-              builder: (context) => VideoPreviewScreen(
-                videoPath: video.path,
-              ),
-            ),
-          );
-          
-          if (result != null && mounted) {
-            // Save the video to gallery
-            try {
-              final String savePath = await _getVideoSavePath();
-              await File(result).copy(savePath);
-              await File(result).delete().catchError((e) {
-                debugPrint('Error deleting temp file: $e');
-                return File(result); // Return the original file if deletion fails
-              });
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Video saved successfully'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            } catch (e) {
-              debugPrint('Error saving video: $e');
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error saving video: $e'),
-                    backgroundColor: Colors.red,
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              }
-            }
-          }
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error picking video: $e'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    }
-  }
-
-  Widget _buildErrorWidget() {
+  Widget _buildErrorWidget(String error) {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Center(
@@ -587,14 +392,22 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
               size: 48,
             ),
             const SizedBox(height: 16),
-            Text(
-              _errorMessage ?? 'Unknown error occurred',
-              style: const TextStyle(color: Colors.white),
-              textAlign: TextAlign.center,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                error,
+                style: const TextStyle(color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => _initializeCamera(),
+              onPressed: () {
+                setState(() {
+                  _errorMessage = null;
+                  _initializationFuture = _initializeServices();
+                });
+              },
               child: const Text('Retry'),
             ),
           ],
@@ -603,183 +416,210 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_errorMessage != null) {
-      return _buildErrorWidget();
-    }
-
-    if (!_isInitialized || _controller == null || !_controller!.value.isInitialized) {
+  Widget _buildCameraUI() {
+    if (!_isReady) {
       return const Scaffold(
         backgroundColor: Colors.black,
         body: Center(
-          child: CircularProgressIndicator(
-            color: Colors.white,
-          ),
+          child: CircularProgressIndicator(),
         ),
       );
     }
 
     final size = MediaQuery.of(context).size;
     final deviceRatio = size.width / size.height;
-    final scale = _controller!.value.aspectRatio / deviceRatio;
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final previewRatio = _cameraService!.controller!.value.aspectRatio;
+    
+    // Calculate the preview scaling
+    final scale = deviceRatio > previewRatio 
+      ? deviceRatio / previewRatio 
+      : previewRatio / deviceRatio;
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Center(
-              child: Transform.scale(
-                scale: isLandscape ? 1 : scale,
-                child: AspectRatio(
-                  aspectRatio: _controller!.value.aspectRatio,
+    return PopScope(
+      canPop: !_cameraService!.isRecording,
+      onPopInvokedWithResult: (bool didPop) async {
+        if (!didPop && _cameraService!.isRecording) {
+          await _toggleRecording();
+          return false;
+        }
+        return true;
+      } as PopInvokedWithResultCallback<bool>,
+      child: Scaffold(
+        backgroundColor: Colors.red.withAlpha((0.2 * 255).round()),
+        body: SafeArea(
+          child: Stack(
+            children: [
+              // Camera preview with scaling
+              Transform.scale(
+                scale: scale,
+                child: Center(
                   child: GestureDetector(
                     onTapDown: _handleTapToFocus,
                     onScaleStart: _handleScaleStart,
                     onScaleUpdate: _handleScaleUpdate,
-                    child: CameraPreview(
-                      _controller!,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          if (_focusPoint != null)
-                            Positioned(
-                              left: _focusPoint!.dx - 20,
-                              top: _focusPoint!.dy - 20,
-                              child: Container(
-                                height: 40,
-                                width: 40,
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 2,
-                                  ),
-                                  shape: BoxShape.circle,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        CameraPreview(_cameraService!.controller!),
+                        // Focus point indicator
+                        if (_focusPoint != null)
+                          Positioned(
+                            left: _focusPoint!.dx - 20,
+                            top: _focusPoint!.dy - 20,
+                            child: Container(
+                              height: 40,
+                              width: 40,
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2,
                                 ),
+                                shape: BoxShape.circle,
                               ),
                             ),
-                        ],
-                      ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
               ),
-            ),
-            
-            // Zoom level indicator
-            Positioned(
-              top: 20,
-              right: 20,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${_currentZoomLevel.toStringAsFixed(1)}x',
-                  style: const TextStyle(color: Colors.white),
-                ),
-              ),
-            ),
 
-            // Recording duration indicator
-            if (_isRecording)
+              // Zoom level indicator
               Positioned(
                 top: 20,
-                left: 20,
+                right: 20,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.black.withAlpha((0.5 * 255).round()),
+                    borderRadius: BorderRadius.circular(4),
                   ),
+                  child: Text(
+                    '${_baseScaleFactor.toStringAsFixed(1)}x',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+              ),
+
+              // Recording duration indicator
+              if (_cameraService!.isRecording)
+                Positioned(
+                  top: 20,
+                  left: 20,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withAlpha((0.5 * 255).round()),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _formatDuration(_timerService?.duration),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // Camera controls
+              Positioned(
+                bottom: 20,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
+                      IconButton(
+                        icon: const Icon(Icons.photo_library),
+                        color: Colors.white,
+                        onPressed: _cameraService!.isRecording ? null : _pickFromGallery,
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _formatDuration(_recordingDuration),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      
+                      IconButton(
+                        icon: const Icon(Icons.flip_camera_ios),
+                        color: Colors.white,
+                        onPressed: _cameraService!.isRecording ? null : _switchCamera,
+                      ),
+                      
+                      Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          if (_cameraService!.isRecording)
+                            SizedBox(
+                              width: 70,
+                              height: 70,
+                              child: CircularProgressIndicator(
+                                value: (_timerService?.duration.inSeconds ?? 0) / 
+                                      (_timerService?.maxDuration.inSeconds ?? 1),
+                                color: Colors.red,
+                                backgroundColor: Colors.red.withAlpha((0.2 * 255).round()),
+                              ),
+                            ),
+                          IconButton(
+                            icon: Icon(
+                              _cameraService!.isRecording ? Icons.stop : Icons.fiber_manual_record,
+                              size: 50,
+                            ),
+                            color: _cameraService!.isRecording ? Colors.red : Colors.white,
+                            onPressed: _toggleRecording,
+                          ),
+                        ],
+                      ),
+                      
+                      IconButton(
+                        icon: Icon(_getFlashIcon()),
+                        color: Colors.white,
+                        onPressed: _cameraService!.isRecording ? null : _toggleFlash,
                       ),
                     ],
                   ),
                 ),
               ),
-
-            // Camera controls with recording progress
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                color: Colors.black54,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.photo_library),
-                      color: Colors.white,
-                      onPressed: _isRecording ? null : _pickFromGallery,
-                    ),
-                    
-                    IconButton(
-                      icon: const Icon(Icons.flip_camera_ios),
-                      color: Colors.white,
-                      onPressed: _isRecording ? null : (_cameras.length < 2 ? null : _switchCamera),
-                    ),
-                    
-                    Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        if (_isRecording)
-                          SizedBox(
-                            width: 70,
-                            height: 70,
-                            child: CircularProgressIndicator(
-                              value: _recordingDuration.inSeconds / _maxRecordingDuration.inSeconds,
-                              color: Colors.red,
-                              backgroundColor: Colors.red.withOpacity(0.2),
-                            ),
-                          ),
-                        IconButton(
-                          icon: Icon(
-                            _isRecording ? Icons.stop : Icons.fiber_manual_record,
-                            size: 50,
-                          ),
-                          color: _isRecording ? Colors.red : Colors.white,
-                          onPressed: _toggleRecording,
-                        ),
-                      ],
-                    ),
-                    
-                    IconButton(
-                      icon: Icon(_getFlashIcon()),
-                      color: Colors.white,
-                      onPressed: _isRecording ? null : _toggleFlash,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder(
+      future: _initializationFuture,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _buildErrorWidget(snapshot.error.toString());
+        }
+
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            backgroundColor: Colors.black,
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+
+        return _errorMessage != null
+          ? _buildErrorWidget(_errorMessage!)
+          : _buildCameraUI();
+      },
     );
   }
 } 

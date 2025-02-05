@@ -25,4 +25,4 @@ For detailed system design including diagrams, refer to the [System Design Docum
 
 - Enhance the Metrics Module with detailed analytics and monitoring tools.
 - Transition to more robust state management solutions (e.g., Bloc or Riverpod) as the app scales.
-- Continuously update design diagrams and architecture documentation to reflect evolving requirements and optimizations. 
+- Continuously update design diagrams and architecture documentation to reflect evolving requirements and optimizations.

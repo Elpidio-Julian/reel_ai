@@ -34,25 +34,25 @@
 - [x ] Implement proper camera lifecycle management
 
 ## 4. Gallery Selection
-- [ ] Implement video picker from gallery
-- [ ] Add file size checks
-- [ ] Add duration limits
-- [ ] Handle unsupported formats
-- [ ] Create thumbnail previews
-- [ ] Implement multi-select capability (if needed)
+- [ x ] Implement video picker from gallery
+- [ x] Add file size checks
+- [ x] Add duration limits
+- [ x] Handle unsupported formats
+- [ x] Create thumbnail previews
+- [ x] Implement multi-select capability (if needed)
 
 ## 5. Video Preview
-- [ ] Create preview screen
-- [ ] Implement video player controls
-  - [ ] Play/pause
-  - [ ] Seek functionality
-  - [ ] Volume control
-- [ ] Add basic trim functionality
-- [ ] Display video metadata
-  - [ ] Duration
-  - [ ] Size
-  - [ ] Resolution
-- [ ] Add accept/reject options
+- [ x] Create preview screen
+- [ x] Implement video player controls
+  - [ x] Play/pause
+  - [ x] Seek functionality
+  - [ x] Volume control
+- [ x] Add basic trim functionality
+- [ x] Display video metadata
+  - [ x] Duration
+  - [ x] Size
+  - [ x] Resolution
+- [ x] Add accept/reject options
 
 ## 6. UI/UX Implementation
 - [ ] Design camera screen layout

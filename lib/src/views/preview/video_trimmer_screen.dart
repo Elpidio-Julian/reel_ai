@@ -9,7 +9,7 @@ class VideoTrimmerScreen extends StatefulWidget {
   const VideoTrimmerScreen({
     super.key,
     required this.videoPath,
-    this.maxDuration = const Duration(minutes: 3),
+    required this.maxDuration,
   });
 
   @override
@@ -19,11 +19,11 @@ class VideoTrimmerScreen extends StatefulWidget {
 class _VideoTrimmerScreenState extends State<VideoTrimmerScreen> {
   late VideoPlayerController _controller;
   bool _isPlaying = false;
+  bool _isSaving = false;
   Duration _startPosition = Duration.zero;
   Duration _endPosition = Duration.zero;
   Duration _currentPosition = Duration.zero;
   bool _isInitialized = false;
-  bool _isSaving = false;
 
   @override
   void initState() {
@@ -32,26 +32,101 @@ class _VideoTrimmerScreenState extends State<VideoTrimmerScreen> {
   }
 
   Future<void> _initializeVideo() async {
-    _controller = VideoPlayerController.file(File(widget.videoPath));
-    
-    await _controller.initialize();
-    _endPosition = _controller.value.duration;
-    
-    _controller.addListener(() {
-      if (mounted) {
+    try {
+      _controller = VideoPlayerController.file(File(widget.videoPath));
+      
+      await _controller.initialize();
+      if (!mounted) {
+        await _controller.dispose();
+        return;
+      }
+      
+      setState(() {
+        _endPosition = _controller.value.duration;
+        _isInitialized = true;
+      });
+
+      _controller.addListener(() {
+        if (!mounted) return;
+        
+        final position = _controller.value.position;
         setState(() {
-          _currentPosition = _controller.value.position;
-          if (_currentPosition >= _endPosition) {
+          _currentPosition = position;
+          if (position >= _endPosition) {
             _controller.pause();
             _controller.seekTo(_startPosition);
             _isPlaying = false;
           }
         });
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error initializing video: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
-    });
+      rethrow;
+    }
+  }
 
+  Future<void> _saveVideo() async {
+    if (!mounted) return;
+    
+    try {
+      setState(() {
+        _isSaving = true;
+      });
+
+      // Validate selection
+      final selectedDuration = _endPosition - _startPosition;
+      if (selectedDuration > widget.maxDuration) {
+        if (!mounted) return;
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Please select a duration under ${widget.maxDuration.inMinutes} minutes'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // For now, we'll return the original path since we're not actually trimming
+      // In a real implementation, you'd want to use FFmpeg or similar to trim the video
+      if (!mounted) return;
+      Navigator.of(context).pop(widget.videoPath);
+    } catch (e) {
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error saving video: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _togglePlayPause() async {
+    if (!mounted) return;
+    
     setState(() {
-      _isInitialized = true;
+      if (_isPlaying) {
+        _controller.pause();
+      } else {
+        _controller.seekTo(_startPosition);
+        _controller.play();
+      }
+      _isPlaying = !_isPlaying;
     });
   }
 
@@ -62,57 +137,9 @@ class _VideoTrimmerScreenState extends State<VideoTrimmerScreen> {
     return "$minutes:$seconds";
   }
 
-  Future<void> _togglePlayPause() async {
-    if (_isPlaying) {
-      await _controller.pause();
-    } else {
-      await _controller.seekTo(_startPosition);
-      await _controller.play();
-    }
-    setState(() {
-      _isPlaying = !_isPlaying;
-    });
-  }
-
-  Future<String?> _saveVideo() async {
-    if (_isSaving) return null;
-    
-    setState(() => _isSaving = true);
-    
-    try {
-      final Duration selectedDuration = _endPosition - _startPosition;
-      if (selectedDuration > widget.maxDuration) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Please select a shorter interval (max ${widget.maxDuration.inMinutes} minutes)'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return null;
-      }
-
-      // For now, we'll return the original path since we're not actually trimming
-      // In a real implementation, you'd want to use FFmpeg or similar to trim the video
-      return widget.videoPath;
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving video: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      return null;
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
-    }
-  }
-
   @override
   void dispose() {
+    _controller.pause();
     _controller.dispose();
     super.dispose();
   }
@@ -136,27 +163,20 @@ class _VideoTrimmerScreenState extends State<VideoTrimmerScreen> {
         title: const Text('Trim Video'),
         actions: [
           TextButton(
-            onPressed: _isSaving
-                ? null
-                : () async {
-                    final path = await _saveVideo();
-                    if (path != null && mounted) {
-                      Navigator.of(context).pop(path);
-                    }
-                  },
+            onPressed: _isSaving ? null : _saveVideo,
             child: _isSaving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text(
-                    'Save',
-                    style: TextStyle(color: Colors.white),
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
                   ),
+                )
+              : const Text(
+                  'Save',
+                  style: TextStyle(color: Colors.white),
+                ),
           ),
         ],
       ),
@@ -191,6 +211,7 @@ class _VideoTrimmerScreenState extends State<VideoTrimmerScreen> {
               min: 0,
               max: _controller.value.duration.inMilliseconds.toDouble(),
               onChanged: (value) {
+                if (!mounted) return;
                 final newPosition = Duration(milliseconds: value.toInt());
                 setState(() {
                   _currentPosition = newPosition;
@@ -205,6 +226,7 @@ class _VideoTrimmerScreenState extends State<VideoTrimmerScreen> {
                   icon: const Icon(Icons.flag_outlined),
                   color: Colors.white,
                   onPressed: () {
+                    if (!mounted) return;
                     setState(() {
                       _startPosition = _currentPosition;
                     });
@@ -220,6 +242,7 @@ class _VideoTrimmerScreenState extends State<VideoTrimmerScreen> {
                   icon: const Icon(Icons.flag),
                   color: Colors.white,
                   onPressed: () {
+                    if (!mounted) return;
                     setState(() {
                       _endPosition = _currentPosition;
                     });
