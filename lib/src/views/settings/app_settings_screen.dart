@@ -160,7 +160,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 ),
               ),
             );
-          }).toList(),
+          }),
 
           const Divider(),
 

@@ -23,7 +23,7 @@ final videoServiceProvider = Provider<VideoService>.internal(
 // ignore: unused_element
 typedef VideoServiceRef = ProviderRef<VideoService>;
 String _$videoUploadControllerHash() =>
-    r'c36d68b5f66892fac836e0a7a0948b109e89a6be';
+    r'b843d82f9c975e9a80ac19f3be2cd75f8638ca5d';
 
 /// See also [VideoUploadController].
 @ProviderFor(VideoUploadController)

@@ -1,5 +1,6 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
 import 'dart:ui';
 
@@ -21,25 +22,22 @@ class CameraServiceError implements Exception {
   String toString() => 'CameraServiceError: $message${code != null ? ' ($code)' : ''}';
 }
 
-class CameraService {
+class CameraService extends StateNotifier<CameraServiceState> {
   CameraController? _controller;
-  CameraServiceState _state = CameraServiceState.uninitialized;
   List<CameraDescription> _cameras = [];
   int _selectedCameraIndex = 0;
-  Timer? _recordingTimer;
+  
+  CameraService() : super(CameraServiceState.uninitialized);
   
   // Getters
-  CameraServiceState get state => _state;
   CameraController? get controller => _controller;
-  bool get isInitialized => _state == CameraServiceState.ready;
-  bool get isRecording => _state == CameraServiceState.recording;
   
   // Initialize camera
   Future<void> initialize() async {
-    if (_state == CameraServiceState.initializing) return;
+    if (state == CameraServiceState.initializing) return;
     
     try {
-      _state = CameraServiceState.initializing;
+      state = CameraServiceState.initializing;
       
       // Get available cameras
       _cameras = await availableCameras();
@@ -48,9 +46,9 @@ class CameraService {
       }
       
       await _setupCamera(_selectedCameraIndex);
-      _state = CameraServiceState.ready;
+      state = CameraServiceState.ready;
     } catch (e) {
-      _state = CameraServiceState.error;
+      state = CameraServiceState.error;
       throw CameraServiceError(
         'Failed to initialize camera: ${e.toString()}',
         code: e is CameraException ? e.code : null
@@ -65,13 +63,17 @@ class CameraService {
     }
 
     // Dispose existing controller
-    await dispose();
+    if (_controller != null) {
+      await _controller!.dispose();
+      _controller = null;
+    }
     
     try {
       final controller = CameraController(
         _cameras[index],
         ResolutionPreset.medium,
         enableAudio: true,
+        imageFormatGroup: ImageFormatGroup.yuv420,
       );
       
       _controller = controller;
@@ -102,13 +104,13 @@ class CameraService {
   
   // Start recording
   Future<void> startRecording() async {
-    if (!isInitialized || isRecording || _controller == null) {
+    if (state != CameraServiceState.ready || _controller == null) {
       throw CameraServiceError('Cannot start recording in current state');
     }
     
     try {
       await _controller!.startVideoRecording();
-      _state = CameraServiceState.recording;
+      state = CameraServiceState.recording;
     } on CameraException catch (e) {
       throw CameraServiceError(
         'Failed to start recording: ${e.description}',
@@ -119,13 +121,13 @@ class CameraService {
   
   // Stop recording
   Future<String> stopRecording() async {
-    if (!isRecording || _controller == null) {
+    if (state != CameraServiceState.recording || _controller == null) {
       throw CameraServiceError('Not recording');
     }
     
     try {
       final XFile file = await _controller!.stopVideoRecording();
-      _state = CameraServiceState.ready;
+      state = CameraServiceState.ready;
       return file.path;
     } on CameraException catch (e) {
       throw CameraServiceError(
@@ -137,7 +139,7 @@ class CameraService {
   
   // Set flash mode
   Future<void> setFlashMode(FlashMode mode) async {
-    if (!isInitialized || _controller == null) return;
+    if (state != CameraServiceState.ready || _controller == null) return;
     
     try {
       await _controller!.setFlashMode(mode);
@@ -148,7 +150,7 @@ class CameraService {
   
   // Set focus point
   Future<void> setFocusPoint(Offset point) async {
-    if (!isInitialized || _controller == null) return;
+    if (state != CameraServiceState.ready || _controller == null) return;
     
     try {
       await _controller!.setFocusMode(FocusMode.locked);
@@ -159,24 +161,22 @@ class CameraService {
     }
   }
   
-  // Clean up resources
-  Future<void> dispose() async {
-    _recordingTimer?.cancel();
-    _recordingTimer = null;
-    
+  @override
+  void dispose() {
     if (_controller != null) {
-      if (isRecording) {
+      if (state == CameraServiceState.recording) {
         try {
-          await stopRecording();
+          stopRecording();
         } catch (e) {
           debugPrint('Error stopping recording during dispose: $e');
         }
       }
       
-      await _controller!.dispose();
+      _controller!.dispose();
       _controller = null;
     }
     
-    _state = CameraServiceState.uninitialized;
+    state = CameraServiceState.uninitialized;
+    super.dispose();
   }
-} 
+}

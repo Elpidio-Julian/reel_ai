@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_state.dart';
-import '../../models/user.dart';
 import '../../services/firebase_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';

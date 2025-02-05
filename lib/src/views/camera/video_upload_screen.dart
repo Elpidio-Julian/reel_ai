@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/video_upload_provider.dart';
 import 'package:video_player/video_player.dart';
-import '../../services/video_service.dart';
 import 'camera_recording_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 
