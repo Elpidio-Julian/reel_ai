@@ -1,8 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:firebase_storage/firebase_storage.dart';
 import '../models/user.dart';
 import '../repositories/user_repository.dart';
 import '../utils/exceptions.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:io';
 
 class FirebaseService {
   final firebase_auth.FirebaseAuth _auth;
@@ -86,20 +88,70 @@ class FirebaseService {
     }
   }
 
-  // Get user stream that combines Firebase Auth and Firestore data
+  // Get user stream
   Stream<User?> get userStream {
     return _auth.authStateChanges().asyncMap((firebaseUser) async {
       if (firebaseUser == null) return null;
       
-      try {
-        // Get additional user data from Firestore
-        final userData = await _userRepository.getUserById(firebaseUser.uid);
-        return userData ?? User.fromFirebaseUser(firebaseUser);
-      } catch (e) {
-        // If we can't get Firestore data, return basic user info
-        return User.fromFirebaseUser(firebaseUser);
-      }
+      // Force refresh the user data
+      await firebaseUser.reload();
+      final freshUser = _auth.currentUser;
+      if (freshUser == null) return null;
+
+      // Get updated user data from Firestore
+      final userData = await _userRepository.getUserById(freshUser.uid);
+      return userData ?? User.fromFirebaseUser(freshUser);
     });
+  }
+
+  // Update user profile
+  Future<User> updateProfile({
+    String? displayName,
+    File? photoFile,
+  }) async {
+    try {
+      final currentFirebaseUser = _auth.currentUser;
+      if (currentFirebaseUser == null) {
+        throw AuthException('No user is currently signed in');
+      }
+
+      // Update display name if provided
+      if (displayName != null && displayName.isNotEmpty) {
+        await currentFirebaseUser.updateDisplayName(displayName);
+      }
+
+      // Update photo if provided
+      String? photoUrl;
+      if (photoFile != null) {
+        final storageRef = FirebaseStorage.instance
+            .ref()
+            .child('user_photos')
+            .child('${currentFirebaseUser.uid}.jpg');
+        
+        await storageRef.putFile(photoFile);
+        photoUrl = await storageRef.getDownloadURL();
+        await currentFirebaseUser.updatePhotoURL(photoUrl);
+      }
+
+      // Force refresh the user data
+      await currentFirebaseUser.reload();
+      final updatedFirebaseUser = _auth.currentUser;
+      if (updatedFirebaseUser == null) {
+        throw AuthException('User not found after update');
+      }
+
+      final updatedUser = User.fromFirebaseUser(updatedFirebaseUser);
+      
+      // Update Firestore
+      await _userRepository.updateUser(updatedUser.id, updatedUser.toMap());
+      
+      // Notify auth state changes
+      _auth.currentUser?.reload();
+      
+      return updatedUser;
+    } catch (e) {
+      throw AuthException('Failed to update profile: ${e.toString()}');
+    }
   }
 
   String getAuthErrorMessage(String code) {

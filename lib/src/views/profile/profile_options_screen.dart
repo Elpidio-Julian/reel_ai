@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../routes.dart';
 import '../../providers/auth_state.dart';
 import '../settings/app_settings_screen.dart';
+import 'edit_profile_screen.dart';
 
 class ProfileOptionsScreen extends ConsumerWidget {
   const ProfileOptionsScreen({super.key});
@@ -40,12 +41,12 @@ class ProfileOptionsScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.person_outline),
             title: const Text('Edit Profile'),
-            onTap: () {
-              // TODO: Implement edit profile
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Coming soon: Edit Profile')),
-              );
-            },
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const EditProfileScreen(),
+              ),
+            ),
           ),
 
           ListTile(

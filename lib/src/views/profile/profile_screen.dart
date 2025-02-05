@@ -31,6 +31,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   ];
 
   void _onItemTapped(int index) {
+    if (index == 0) {
+      // Navigate to camera screen when camera tab is tapped
+      Navigator.pushNamed(context, Routes.camera);
+      return;
+    }
     setState(() {
       _selectedIndex = index;
     });

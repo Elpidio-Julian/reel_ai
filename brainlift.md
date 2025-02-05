@@ -175,6 +175,80 @@
 4. Analytics integration
 5. A/B testing framework
 
+# Camera Upload Feature Analysis
+
+## Problem/Feature Overview
+Initial Requirements:
+- Gallery video selection
+- Video preview functionality
+- Firebase storage integration
+- Clean state management
+
+Key Challenges:
+- Video player initialization
+- State management complexity
+- Firebase security configuration
+
+Success Criteria:
+- Smooth video selection and preview
+- Successful uploads to Firebase
+- Proper error handling
+- Clean UI/UX
+
+## Solution Attempts
+
+### Attempt 1: Complex Service Architecture
+- Approach: Multiple services (Camera, Storage, Timer)
+- Implementation: Tightly coupled services with complex state
+- Outcome: Failed due to state management issues
+- Learnings: Simpler architecture needed
+
+### Attempt 2: Simplified Riverpod Implementation
+- Approach: Single provider with clear state model
+- Implementation: CameraScreenState with Riverpod
+- Outcome: Success after Firebase rules update
+- Learnings: KISS principle works well
+
+## Final Solution
+
+Implementation Details:
+- Single CameraScreenState for UI state
+- VideoPlayerController for preview
+- VideoService for uploads
+- Proper Firebase security rules
+
+Why It Works:
+- Clear separation of concerns
+- Predictable state management
+- Proper security configuration
+
+Key Components:
+- CameraScreenProvider
+- VideoService
+- Firebase Storage/Firestore
+
+## Key Lessons
+
+Technical Insights:
+- Riverpod simplifies state management
+- Firebase rules are critical
+- Video initialization needs care
+
+Process Improvements:
+- Start simple, add features gradually
+- Test security early
+- Handle video lifecycle properly
+
+Best Practices:
+- Follow KISS principle
+- Use Riverpod for state
+- Implement proper error handling
+
+Anti-Patterns to Avoid:
+- Over-engineered services
+- Complex state management
+- Unsafe Firebase rules
+
 # Navigation and State Management Refactor Analysis
 
 ## Problem/Feature Overview
@@ -348,3 +422,86 @@
 3. Offline support
 4. Analytics integration
 5. Performance monitoring 
+
+# Profile Updates Analysis
+
+## Problem/Feature Overview
+### Initial Requirements
+- Implement user profile updates (display name, photo)
+- Add App Check security
+- Fix display name update UI issues
+
+### Key Challenges
+- State management for immediate UI updates
+- App Check configuration for debug/production
+- Back button handling in Android
+
+### Success Criteria
+- Display name updates show immediately
+- App Check properly configured
+- Back button works correctly
+
+## Solution Attempts
+
+### Attempt 1: Firebase Service Updates
+- Approach: Added reload() calls in service layer
+- Implementation: Modified userStream and updateProfile
+- Outcome: Partial success - data updated but UI lagged
+- Learnings: Firebase Auth needs explicit refresh
+
+### Attempt 2: State Management
+- Approach: Added refreshUser() to AuthState provider
+- Implementation: Direct state updates after profile changes
+- Outcome: Success - immediate UI updates
+- Learnings: Explicit state management beats reactive for immediate updates
+
+### Attempt 3: App Check Integration
+- Approach: Environment-based provider switching
+- Implementation: Debug provider in development, Play Integrity in production
+- Outcome: Success - proper security with development flexibility
+- Learnings: Use env variables for environment-specific configs
+
+## Final Solution
+
+### Implementation Details
+1. AuthState Provider:
+   - Added refreshUser() method
+   - Fixed signOut() type safety
+   - Immediate state updates
+
+2. Firebase Service:
+   - Enhanced updateProfile method
+   - Added proper error handling
+   - Force reload after updates
+
+3. Edit Profile Screen:
+   - Added state refresh after save
+   - Improved error handling
+   - Better loading states
+
+4. App Check:
+   - Environment-based provider selection
+   - Debug mode for development
+   - Play Integrity for production
+
+## Key Lessons
+
+### Technical Insights
+- Firebase Auth state needs explicit refresh
+- Riverpod state management is powerful but needs careful handling
+- Environment-based configuration is crucial for security features
+
+### Process Improvements
+- Test state updates immediately
+- Consider all environments (dev/prod)
+- Handle Android-specific requirements early
+
+### Best Practices
+- Force refresh after critical updates
+- Use environment variables for configuration
+- Add proper error handling and loading states
+
+### Anti-Patterns to Avoid
+- Relying solely on reactive updates
+- Hardcoding security providers
+- Ignoring platform-specific requirements

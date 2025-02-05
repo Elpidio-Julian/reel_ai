@@ -44,4 +44,15 @@ class AuthState extends _$AuthState {
       return null;
     });
   }
+
+  Future<void> refreshUser() async {
+    final currentUser = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      await currentUser.reload();
+      final freshUser = firebase_auth.FirebaseAuth.instance.currentUser;
+      if (freshUser != null) {
+        state = AsyncData(User.fromFirebaseUser(freshUser));
+      }
+    }
+  }
 } 

@@ -27,4 +27,7 @@ class EnvConfig {
   
   static String get firebaseDatabaseUrl =>
     dotenv.dotenv.env['FIREBASE_DATABASE_URL'] ?? 'https://reel-ai-424c6-default-rtdb.firebaseio.com';
+  
+  static bool get isProduction =>
+    dotenv.dotenv.env['APP_ENV'] == 'false';
 } 
