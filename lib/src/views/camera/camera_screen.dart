@@ -47,8 +47,15 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
       );
       _cameraService = CameraService();
 
-      // Initialize camera last
-      await _cameraService?.initialize();
+      // Initialize camera with a timeout to avoid hanging
+      await _cameraService!.initialize().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception("Camera initialization timed out.");
+        },
+      );
+      
+      if (!mounted) return;
     } catch (e) {
       await _disposeResources();
       throw Exception('Failed to initialize camera: $e');

@@ -1,22 +1,34 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../routes.dart';
-import '../../providers/auth_provider.dart';
+import '../../providers/auth_state.dart';
 
-class RegisterScreen extends StatefulWidget {
+class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
   @override
-  State<RegisterScreen> createState() => _RegisterScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Check if user is already logged in
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authState = ref.read(authStateProvider);
+      if (authState.hasValue && authState.value != null) {
+        Navigator.pushReplacementNamed(context, Routes.profile);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -29,20 +41,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _handleRegister() async {
     if (_formKey.currentState?.validate() ?? false) {
       try {
-        final authProvider = context.read<AuthProvider>();
-        await authProvider.register(
+        await ref.read(authStateProvider.notifier).register(
           _emailController.text.trim(),
           _passwordController.text,
         );
         
-        if (mounted && authProvider.isAuthenticated) {
-          Navigator.pushReplacementNamed(context, Routes.home);
+        if (mounted) {
+          final authState = ref.read(authStateProvider);
+          if (authState.hasValue && authState.value != null) {
+            Navigator.pushReplacementNamed(context, Routes.profile);
+          }
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(context.read<AuthProvider>().error ?? 'An error occurred'),
+              content: Text(e.toString()),
               backgroundColor: Colors.red,
             ),
           );
@@ -53,7 +67,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = context.watch<AuthProvider>();
+    final authState = ref.watch(authStateProvider);
     
     return Scaffold(
       appBar: AppBar(
@@ -142,8 +156,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: authProvider.isLoading ? null : _handleRegister,
-                child: authProvider.isLoading
+                onPressed: authState.isLoading ? null : _handleRegister,
+                child: authState.isLoading
                     ? const SizedBox(
                         height: 20,
                         width: 20,
