@@ -84,6 +84,14 @@ class VideoUploadController extends _$VideoUploadController {
     );
   }
 
+  void setRecordedVideo(File videoFile) {
+    state = state.copyWith(
+      selectedVideo: videoFile,
+      isLoading: false,
+      error: null,
+    );
+  }
+
   Future<void> uploadVideo() async {
     if (state.selectedVideo == null) {
       state = state.copyWith(error: 'No video selected');

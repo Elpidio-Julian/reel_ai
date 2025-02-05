@@ -32,8 +32,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _onItemTapped(int index) {
     if (index == 0) {
-      // Navigate to camera screen when camera tab is tapped
-      Navigator.pushNamed(context, Routes.camera);
+      // Navigate to upload screen when upload/record tab is tapped
+      Navigator.pushNamed(context, Routes.upload);
       return;
     }
     setState(() {
@@ -58,7 +58,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
             icon: Icon(Icons.camera_alt),
-            label: 'Camera',
+            label: 'Upload/Record',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.video_library),

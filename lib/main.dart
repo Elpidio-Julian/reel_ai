@@ -7,6 +7,7 @@ import 'src/views/auth/login_screen.dart';
 import 'src/views/auth/register_screen.dart';
 import 'src/views/profile/profile_screen.dart';
 import 'src/views/camera/camera_recording_screen.dart';
+import 'src/views/camera/video_upload_screen.dart';
 import 'src/views/splash/splash_screen.dart';
 import 'firebase_options.dart';
 import 'src/config/env_config.dart';
@@ -56,6 +57,7 @@ class MyApp extends ConsumerWidget {
         Routes.register: (context) => const RegisterScreen(),
         Routes.profile: (context) => const ProfileScreen(),
         Routes.camera: (context) => const CameraRecordingScreen(),
+        Routes.upload: (context) => const VideoUploadScreen(),
       },
     );
   }

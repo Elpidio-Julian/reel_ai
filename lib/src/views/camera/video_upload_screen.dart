@@ -5,14 +5,10 @@ import '../../providers/video_upload_provider.dart';
 import 'package:video_player/video_player.dart';
 import '../../services/video_service.dart';
 import 'camera_recording_screen.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class VideoUploadScreen extends ConsumerStatefulWidget {
-  final File? videoFile;
-  
-  const VideoUploadScreen({
-    super.key,
-    this.videoFile,
-  });
+  const VideoUploadScreen({super.key});
 
   @override
   ConsumerState<VideoUploadScreen> createState() => _VideoUploadScreenState();
@@ -25,9 +21,6 @@ class _VideoUploadScreenState extends ConsumerState<VideoUploadScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.videoFile != null) {
-      _initializeVideo(widget.videoFile!.path);
-    }
   }
 
   @override
@@ -36,12 +29,89 @@ class _VideoUploadScreenState extends ConsumerState<VideoUploadScreen> {
     super.dispose();
   }
 
-  void _navigateToCameraRecording() {
+  Future<void> _checkAndRequestPermissions() async {
+    final permissions = [
+      Permission.camera,
+      Permission.microphone,
+      Permission.videos,
+      Permission.photos,
+    ];
+
+    // Check current status
+    final statuses = await Future.wait(
+      permissions.map((permission) => permission.status),
+    );
+
+    // If any permission is not granted, show settings dialog
+    if (statuses.any((status) => !status.isGranted)) {
+      if (!mounted) return;
+      
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Permissions Required'),
+          content: const Text('Camera, microphone, and media access are required to record and select videos. Would you like to grant these permissions?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Settings'),
+            ),
+          ],
+        ),
+      );
+
+      if (result == true) {
+        await openAppSettings();
+        return;
+      }
+      return;
+    }
+
+    // All permissions granted, proceed to camera
+    if (!mounted) return;
+    
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const CameraRecordingScreen(),
       ),
     );
+  }
+
+  Future<void> _showVideoOptions() async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Choose from Gallery'),
+                onTap: () => Navigator.pop(context, 'gallery'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Record New Video'),
+                onTap: () => Navigator.pop(context, 'camera'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!mounted) return;
+
+    if (action == 'gallery') {
+      ref.read(videoUploadControllerProvider.notifier).pickVideo();
+    } else if (action == 'camera') {
+      await _checkAndRequestPermissions();
+    }
   }
 
   Future<void> _initializeVideo(String path) async {
@@ -52,10 +122,7 @@ class _VideoUploadScreenState extends ConsumerState<VideoUploadScreen> {
       final oldController = _controller;
       final newController = VideoPlayerController.file(File(path));
       
-      // Initialize new controller
       await newController.initialize();
-      
-      // Dispose old controller after new one is ready
       await oldController?.dispose();
       
       if (mounted) {
@@ -64,7 +131,6 @@ class _VideoUploadScreenState extends ConsumerState<VideoUploadScreen> {
           _isInitializing = false;
         });
         
-        // Auto-play the first time
         _controller?.play();
       }
     } catch (e) {
@@ -80,7 +146,6 @@ class _VideoUploadScreenState extends ConsumerState<VideoUploadScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(videoUploadControllerProvider);
 
-    // Initialize video player when a video is selected
     if (state.selectedVideo != null && 
         (_controller == null || state.selectedVideo!.path != _controller!.dataSource)) {
       _initializeVideo(state.selectedVideo!.path);
@@ -127,24 +192,10 @@ class _VideoUploadScreenState extends ConsumerState<VideoUploadScreen> {
                 child: Text('Select or record a video to upload'),
               ),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: state.isLoading 
-                    ? null 
-                    : () => ref.read(videoUploadControllerProvider.notifier).pickVideo(),
-                  icon: const Icon(Icons.video_library),
-                  label: const Text('Choose Video'),
-                ),
-                ElevatedButton.icon(
-                  onPressed: state.isLoading 
-                    ? null 
-                    : _navigateToCameraRecording,
-                  icon: const Icon(Icons.camera_alt),
-                  label: const Text('Record Video'),
-                ),
-              ],
+            ElevatedButton.icon(
+              onPressed: state.isLoading ? null : _showVideoOptions,
+              icon: const Icon(Icons.add_circle_outline),
+              label: const Text('Add Video'),
             ),
             if (state.selectedVideo != null) ...[
               const SizedBox(height: 16),
