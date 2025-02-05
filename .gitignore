@@ -54,4 +54,13 @@ release.jks
 /android/app/profile
 /android/app/release
 
+# Environment files
+.env
+.env.*
+!.env.template
+
+
+.cursorrules
+
+# windsurf rules
 

@@ -38,7 +38,19 @@ class UserRepository {
       await _firestore
           .collection(_collection)
           .doc(userId)
-          .update(data);
+          .set(data, SetOptions(merge: true));
+    } catch (e) {
+      throw UserException('Failed to update user data: ${e.toString()}');
+    }
+  }
+
+  // Update user from model
+  Future<void> updateUserFromModel(User user) async {
+    try {
+      await _firestore
+          .collection(_collection)
+          .doc(user.id)
+          .update(user.toMap());
     } catch (e) {
       throw UserException('Failed to update user data: ${e.toString()}');
     }

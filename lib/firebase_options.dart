@@ -3,6 +3,7 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'src/config/env_config.dart';
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
@@ -17,22 +18,14 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      return web;
+      throw UnsupportedError(
+        'Web platform is not supported - configure Firebase Web SDK directly',
+      );
     }
+
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
-      case TargetPlatform.iOS:
-        return ios;
-      case TargetPlatform.macOS:
-        return macos;
-      case TargetPlatform.windows:
-        return windows;
-      case TargetPlatform.linux:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for linux - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
       default:
         throw UnsupportedError(
           'DefaultFirebaseOptions are not supported for this platform.',
@@ -40,54 +33,12 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAj4rK2JvxXQer7-Q1pbglOP7FlCWJcRmk',
-    appId: '1:101842051057:web:286432f3cccdbc2dd5ae50',
-    messagingSenderId: '101842051057',
-    projectId: 'reel-ai-424c6',
-    authDomain: 'reel-ai-424c6.firebaseapp.com',
-    databaseURL: 'https://reel-ai-424c6-default-rtdb.firebaseio.com',
-    storageBucket: 'reel-ai-424c6.firebasestorage.app',
-    measurementId: 'G-2LRT9CBWKF',
-  );
-
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBZi_spK0RohOfKuyoOfq5PhBIkNCEfN-A',
-    appId: '1:101842051057:android:7ae75d1ced8ee1ddd5ae50',
-    messagingSenderId: '101842051057',
-    projectId: 'reel-ai-424c6',
-    databaseURL: 'https://reel-ai-424c6-default-rtdb.firebaseio.com',
-    storageBucket: 'reel-ai-424c6.firebasestorage.app',
-  );
-
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyD55vXmVNSM6gcHlRbkakRkodeyg36VHPw',
-    appId: '1:101842051057:ios:e417d14e1503eafcd5ae50',
-    messagingSenderId: '101842051057',
-    projectId: 'reel-ai-424c6',
-    databaseURL: 'https://reel-ai-424c6-default-rtdb.firebaseio.com',
-    storageBucket: 'reel-ai-424c6.firebasestorage.app',
-    iosBundleId: 'com.example.reelAiApp',
-  );
-
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyD55vXmVNSM6gcHlRbkakRkodeyg36VHPw',
-    appId: '1:101842051057:ios:e417d14e1503eafcd5ae50',
-    messagingSenderId: '101842051057',
-    projectId: 'reel-ai-424c6',
-    databaseURL: 'https://reel-ai-424c6-default-rtdb.firebaseio.com',
-    storageBucket: 'reel-ai-424c6.firebasestorage.app',
-    iosBundleId: 'com.example.reelAiApp',
-  );
-
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyAj4rK2JvxXQer7-Q1pbglOP7FlCWJcRmk',
-    appId: '1:101842051057:web:5d5e0cf3dc112599d5ae50',
-    messagingSenderId: '101842051057',
-    projectId: 'reel-ai-424c6',
-    authDomain: 'reel-ai-424c6.firebaseapp.com',
-    databaseURL: 'https://reel-ai-424c6-default-rtdb.firebaseio.com',
-    storageBucket: 'reel-ai-424c6.firebasestorage.app',
-    measurementId: 'G-9WQK21KYLF',
-  );
+  static FirebaseOptions get android => FirebaseOptions(
+        apiKey: EnvConfig.firebaseAndroidApiKey,
+        appId: EnvConfig.firebaseAndroidAppId,
+        messagingSenderId: EnvConfig.firebaseMessagingSenderId,
+        projectId: EnvConfig.firebaseProjectId,
+        storageBucket: EnvConfig.firebaseStorageBucket,
+        databaseURL: EnvConfig.firebaseDatabaseUrl,
+      );
 }
