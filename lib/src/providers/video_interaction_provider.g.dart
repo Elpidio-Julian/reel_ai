@@ -26,7 +26,7 @@ final videoInteractionRepositoryProvider =
 // ignore: unused_element
 typedef VideoInteractionRepositoryRef = ProviderRef<VideoInteractionRepository>;
 String _$hasUserInteractionHash() =>
-    r'0059eb94bd6bf8261c65d3f9230947f7ab868841';
+    r'34b14f893bfab67c5e2817bd1324c53662b00b15';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -59,13 +59,13 @@ class HasUserInteractionFamily extends Family<AsyncValue<bool>> {
   const HasUserInteractionFamily();
 
   /// See also [hasUserInteraction].
-  HasUserInteractionProvider call(
-    String videoId,
-    String type,
-  ) {
+  HasUserInteractionProvider call({
+    required String videoId,
+    required String type,
+  }) {
     return HasUserInteractionProvider(
-      videoId,
-      type,
+      videoId: videoId,
+      type: type,
     );
   }
 
@@ -74,8 +74,8 @@ class HasUserInteractionFamily extends Family<AsyncValue<bool>> {
     covariant HasUserInteractionProvider provider,
   ) {
     return call(
-      provider.videoId,
-      provider.type,
+      videoId: provider.videoId,
+      type: provider.type,
     );
   }
 
@@ -95,16 +95,16 @@ class HasUserInteractionFamily extends Family<AsyncValue<bool>> {
 }
 
 /// See also [hasUserInteraction].
-class HasUserInteractionProvider extends AutoDisposeFutureProvider<bool> {
+class HasUserInteractionProvider extends AutoDisposeStreamProvider<bool> {
   /// See also [hasUserInteraction].
-  HasUserInteractionProvider(
-    String videoId,
-    String type,
-  ) : this._internal(
+  HasUserInteractionProvider({
+    required String videoId,
+    required String type,
+  }) : this._internal(
           (ref) => hasUserInteraction(
             ref as HasUserInteractionRef,
-            videoId,
-            type,
+            videoId: videoId,
+            type: type,
           ),
           from: hasUserInteractionProvider,
           name: r'hasUserInteractionProvider',
@@ -135,7 +135,7 @@ class HasUserInteractionProvider extends AutoDisposeFutureProvider<bool> {
 
   @override
   Override overrideWith(
-    FutureOr<bool> Function(HasUserInteractionRef provider) create,
+    Stream<bool> Function(HasUserInteractionRef provider) create,
   ) {
     return ProviderOverride(
       origin: this,
@@ -153,7 +153,7 @@ class HasUserInteractionProvider extends AutoDisposeFutureProvider<bool> {
   }
 
   @override
-  AutoDisposeFutureProviderElement<bool> createElement() {
+  AutoDisposeStreamProviderElement<bool> createElement() {
     return _HasUserInteractionProviderElement(this);
   }
 
@@ -176,7 +176,7 @@ class HasUserInteractionProvider extends AutoDisposeFutureProvider<bool> {
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-mixin HasUserInteractionRef on AutoDisposeFutureProviderRef<bool> {
+mixin HasUserInteractionRef on AutoDisposeStreamProviderRef<bool> {
   /// The parameter `videoId` of this provider.
   String get videoId;
 
@@ -185,7 +185,7 @@ mixin HasUserInteractionRef on AutoDisposeFutureProviderRef<bool> {
 }
 
 class _HasUserInteractionProviderElement
-    extends AutoDisposeFutureProviderElement<bool> with HasUserInteractionRef {
+    extends AutoDisposeStreamProviderElement<bool> with HasUserInteractionRef {
   _HasUserInteractionProviderElement(super.provider);
 
   @override
@@ -194,7 +194,7 @@ class _HasUserInteractionProviderElement
   String get type => (origin as HasUserInteractionProvider).type;
 }
 
-String _$videoStatsHash() => r'8c5af541395d3d4513e220330134f9f97b129327';
+String _$videoStatsHash() => r'c51417782a1dfa99ab0ccc1b71aea902472471a7';
 
 /// See also [videoStats].
 @ProviderFor(videoStats)
@@ -206,11 +206,11 @@ class VideoStatsFamily extends Family<AsyncValue<VideoStats?>> {
   const VideoStatsFamily();
 
   /// See also [videoStats].
-  VideoStatsProvider call(
-    String videoId,
-  ) {
+  VideoStatsProvider call({
+    required String videoId,
+  }) {
     return VideoStatsProvider(
-      videoId,
+      videoId: videoId,
     );
   }
 
@@ -219,7 +219,7 @@ class VideoStatsFamily extends Family<AsyncValue<VideoStats?>> {
     covariant VideoStatsProvider provider,
   ) {
     return call(
-      provider.videoId,
+      videoId: provider.videoId,
     );
   }
 
@@ -239,14 +239,14 @@ class VideoStatsFamily extends Family<AsyncValue<VideoStats?>> {
 }
 
 /// See also [videoStats].
-class VideoStatsProvider extends AutoDisposeStreamProvider<VideoStats?> {
+class VideoStatsProvider extends AutoDisposeFutureProvider<VideoStats?> {
   /// See also [videoStats].
-  VideoStatsProvider(
-    String videoId,
-  ) : this._internal(
+  VideoStatsProvider({
+    required String videoId,
+  }) : this._internal(
           (ref) => videoStats(
             ref as VideoStatsRef,
-            videoId,
+            videoId: videoId,
           ),
           from: videoStatsProvider,
           name: r'videoStatsProvider',
@@ -274,7 +274,7 @@ class VideoStatsProvider extends AutoDisposeStreamProvider<VideoStats?> {
 
   @override
   Override overrideWith(
-    Stream<VideoStats?> Function(VideoStatsRef provider) create,
+    FutureOr<VideoStats?> Function(VideoStatsRef provider) create,
   ) {
     return ProviderOverride(
       origin: this,
@@ -291,7 +291,7 @@ class VideoStatsProvider extends AutoDisposeStreamProvider<VideoStats?> {
   }
 
   @override
-  AutoDisposeStreamProviderElement<VideoStats?> createElement() {
+  AutoDisposeFutureProviderElement<VideoStats?> createElement() {
     return _VideoStatsProviderElement(this);
   }
 
@@ -311,13 +311,13 @@ class VideoStatsProvider extends AutoDisposeStreamProvider<VideoStats?> {
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-mixin VideoStatsRef on AutoDisposeStreamProviderRef<VideoStats?> {
+mixin VideoStatsRef on AutoDisposeFutureProviderRef<VideoStats?> {
   /// The parameter `videoId` of this provider.
   String get videoId;
 }
 
 class _VideoStatsProviderElement
-    extends AutoDisposeStreamProviderElement<VideoStats?> with VideoStatsRef {
+    extends AutoDisposeFutureProviderElement<VideoStats?> with VideoStatsRef {
   _VideoStatsProviderElement(super.provider);
 
   @override
@@ -325,7 +325,7 @@ class _VideoStatsProviderElement
 }
 
 String _$userVideoInteractionsHash() =>
-    r'fdb696728421e0a5ea26a622bb333ca0ad0d1c68';
+    r'9219076e0db8f46711feeb258708f0f16225bad0';
 
 /// See also [userVideoInteractions].
 @ProviderFor(userVideoInteractions)
@@ -338,11 +338,11 @@ class UserVideoInteractionsFamily
   const UserVideoInteractionsFamily();
 
   /// See also [userVideoInteractions].
-  UserVideoInteractionsProvider call(
-    String videoId,
-  ) {
+  UserVideoInteractionsProvider call({
+    required String videoId,
+  }) {
     return UserVideoInteractionsProvider(
-      videoId,
+      videoId: videoId,
     );
   }
 
@@ -351,7 +351,7 @@ class UserVideoInteractionsFamily
     covariant UserVideoInteractionsProvider provider,
   ) {
     return call(
-      provider.videoId,
+      videoId: provider.videoId,
     );
   }
 
@@ -374,12 +374,12 @@ class UserVideoInteractionsFamily
 class UserVideoInteractionsProvider
     extends AutoDisposeFutureProvider<List<VideoInteraction>> {
   /// See also [userVideoInteractions].
-  UserVideoInteractionsProvider(
-    String videoId,
-  ) : this._internal(
+  UserVideoInteractionsProvider({
+    required String videoId,
+  }) : this._internal(
           (ref) => userVideoInteractions(
             ref as UserVideoInteractionsRef,
-            videoId,
+            videoId: videoId,
           ),
           from: userVideoInteractionsProvider,
           name: r'userVideoInteractionsProvider',

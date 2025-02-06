@@ -43,11 +43,27 @@ class VideoInteractionRepository {
   // Remove an interaction
   Future<void> removeInteraction(VideoInteraction interaction) async {
     try {
+      // Find the existing interaction first
+      final existingInteractionQuery = await _firestore
+          .collection(_collection)
+          .where('userId', isEqualTo: interaction.userId)
+          .where('videoId', isEqualTo: interaction.videoId)
+          .where('type', isEqualTo: interaction.type)
+          .limit(1)
+          .get();
+
+      if (existingInteractionQuery.docs.isEmpty) {
+        // No interaction to remove
+        return;
+      }
+
+      final existingInteractionDoc = existingInteractionQuery.docs.first;
+      
       // Start a batch write
       final batch = _firestore.batch();
       
       // Remove the interaction
-      final interactionRef = _firestore.collection(_collection).doc(interaction.id);
+      final interactionRef = _firestore.collection(_collection).doc(existingInteractionDoc.id);
       batch.delete(interactionRef);
 
       // Update video stats
@@ -133,5 +149,28 @@ class VideoInteractionRepository {
         code: VideoException.invalidOperation,
       );
     }
+  }
+
+  // Stream user interaction status
+  Stream<bool> streamUserInteraction(String userId, String videoId, String type) {
+    return _firestore
+        .collection(_collection)
+        .where('userId', isEqualTo: userId)
+        .where('videoId', isEqualTo: videoId)
+        .where('type', isEqualTo: type)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.isNotEmpty);
+  }
+
+  // Stream all user interactions for a video
+  Stream<List<VideoInteraction>> streamUserInteractions(String userId, String videoId) {
+    return _firestore
+        .collection(_collection)
+        .where('userId', isEqualTo: userId)
+        .where('videoId', isEqualTo: videoId)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => VideoInteraction.fromMap(doc.data(), doc.id))
+            .toList());
   }
 } 

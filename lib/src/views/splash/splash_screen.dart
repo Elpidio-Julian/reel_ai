@@ -88,7 +88,7 @@ class SplashScreen extends ConsumerWidget {
                   Text(
                     'Error loading app',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 204, red: 255, green: 255, blue: 255),
                     ),
                   ),
                 ],

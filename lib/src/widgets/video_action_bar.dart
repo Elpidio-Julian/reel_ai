@@ -50,32 +50,48 @@ class _VideoActionBarState extends ConsumerState<VideoActionBar> with SingleTick
     HapticFeedback.mediumImpact();
     _likeAnimationController.forward().then((_) => _likeAnimationController.reverse());
     
-    final hasLiked = await ref.read(hasUserInteractionProvider(widget.video.id, VideoInteraction.typeLike).future);
-    if (hasLiked) {
-      await ref.read(videoInteractionControllerProvider.notifier).removeInteraction(
-        widget.video.id,
-        VideoInteraction.typeLike,
-      );
-    } else {
-      await ref.read(videoInteractionControllerProvider.notifier).addInteraction(
-        widget.video.id,
-        VideoInteraction.typeLike,
-      );
+    final hasLiked = await ref.read(hasUserInteractionProvider(videoId: widget.video.id, type: VideoInteraction.typeLike).future);
+    try {
+      if (hasLiked) {
+        await ref.read(videoInteractionControllerProvider.notifier).removeInteraction(
+          widget.video.id,
+          VideoInteraction.typeLike,
+        );
+      } else {
+        await ref.read(videoInteractionControllerProvider.notifier).addInteraction(
+          widget.video.id,
+          VideoInteraction.typeLike,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update like: ${e.toString()}')),
+        );
+      }
     }
   }
 
   Future<void> _handleSave() async {
-    final hasSaved = await ref.read(hasUserInteractionProvider(widget.video.id, VideoInteraction.typeSave).future);
-    if (hasSaved) {
-      await ref.read(videoInteractionControllerProvider.notifier).removeInteraction(
-        widget.video.id,
-        VideoInteraction.typeSave,
-      );
-    } else {
-      await ref.read(videoInteractionControllerProvider.notifier).addInteraction(
-        widget.video.id,
-        VideoInteraction.typeSave,
-      );
+    final hasSaved = await ref.read(hasUserInteractionProvider(videoId: widget.video.id, type: VideoInteraction.typeSave).future);
+    try {
+      if (hasSaved) {
+        await ref.read(videoInteractionControllerProvider.notifier).removeInteraction(
+          widget.video.id,
+          VideoInteraction.typeSave,
+        );
+      } else {
+        await ref.read(videoInteractionControllerProvider.notifier).addInteraction(
+          widget.video.id,
+          VideoInteraction.typeSave,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update save: ${e.toString()}')),
+        );
+      }
     }
   }
 
@@ -122,9 +138,10 @@ class _VideoActionBarState extends ConsumerState<VideoActionBar> with SingleTick
 
   @override
   Widget build(BuildContext context) {
-    final videoStats = ref.watch(videoStatsProvider(widget.video.id));
-    final hasLiked = ref.watch(hasUserInteractionProvider(widget.video.id, VideoInteraction.typeLike));
-    final hasSaved = ref.watch(hasUserInteractionProvider(widget.video.id, VideoInteraction.typeSave));
+    // Use stream-based providers for real-time updates
+    final videoStats = ref.watch(videoStatsProvider(videoId: widget.video.id));
+    final hasLiked = ref.watch(hasUserInteractionProvider(videoId: widget.video.id, type: VideoInteraction.typeLike));
+    final hasSaved = ref.watch(hasUserInteractionProvider(videoId: widget.video.id, type: VideoInteraction.typeSave));
 
     return Container(
       width: 72.0,
@@ -139,7 +156,7 @@ class _VideoActionBarState extends ConsumerState<VideoActionBar> with SingleTick
                 onTap: _handleLike,
                 count: videoStats.when(
                   data: (stats) => '${stats?.likeCount ?? 0}',
-                  loading: () => '0',
+                  loading: () => '...',
                   error: (_, __) => '0',
                 ),
                 isActive: hasLiked.when(
@@ -154,7 +171,7 @@ class _VideoActionBarState extends ConsumerState<VideoActionBar> with SingleTick
                 onTap: widget.onCommentTap,
                 count: videoStats.when(
                   data: (stats) => '${stats?.commentCount ?? 0}',
-                  loading: () => '0',
+                  loading: () => '...',
                   error: (_, __) => '0',
                 ),
               ),
@@ -163,7 +180,7 @@ class _VideoActionBarState extends ConsumerState<VideoActionBar> with SingleTick
                 onTap: widget.onShareTap,
                 count: videoStats.when(
                   data: (stats) => '${stats?.shareCount ?? 0}',
-                  loading: () => '0',
+                  loading: () => '...',
                   error: (_, __) => '0',
                 ),
               ),
@@ -172,7 +189,7 @@ class _VideoActionBarState extends ConsumerState<VideoActionBar> with SingleTick
                 onTap: _handleSave,
                 count: videoStats.when(
                   data: (stats) => '${stats?.saveCount ?? 0}',
-                  loading: () => '0',
+                  loading: () => '...',
                   error: (_, __) => '0',
                 ),
                 isActive: hasSaved.when(

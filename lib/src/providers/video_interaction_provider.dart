@@ -57,7 +57,7 @@ class VideoInteractionController extends _$VideoInteractionController {
       }
 
       final interaction = VideoInteraction(
-        id: const Uuid().v4(), // This ID won't be used for removal
+        id: const Uuid().v4(),
         videoId: videoId,
         userId: user.id,
         type: type,
@@ -73,35 +73,25 @@ class VideoInteractionController extends _$VideoInteractionController {
   }
 }
 
-// Provider for checking if current user has interacted with a video
 @riverpod
-Future<bool> hasUserInteraction(
-  Ref ref,
-  String videoId,
-  String type,
-) async {
-  final User? user = ref.watch(authStateProvider).value;
-  if (user == null) return false;
+Stream<bool> hasUserInteraction(Ref ref, {required String videoId, required String type}) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return Stream.value(false);
 
   return ref.watch(videoInteractionRepositoryProvider)
-      .hasUserInteraction(user.id, videoId, type);
+      .streamUserInteraction(user.id, videoId, type);
 }
 
-// Provider for video stats
 @riverpod
-Stream<VideoStats?> videoStats(Ref ref, String videoId) {
-  return ref.watch(videoInteractionRepositoryProvider).streamVideoStats(videoId);
+Future<VideoStats?> videoStats(Ref ref, {required String videoId}) {
+  return ref.read(videoInteractionRepositoryProvider).getVideoStats(videoId);
 }
 
-// Provider for user interactions with a video
 @riverpod
-Future<List<VideoInteraction>> userVideoInteractions(
-  Ref ref,
-  String videoId,
-) async {
-  final User? user = ref.watch(authStateProvider).value;
+Future<List<VideoInteraction>> userVideoInteractions(Ref ref, {required String videoId}) async {
+  final user = ref.watch(authStateProvider).value;
   if (user == null) return [];
 
-  return ref.watch(videoInteractionRepositoryProvider)
+  return ref.read(videoInteractionRepositoryProvider)
       .getUserInteractions(user.id, videoId);
 } 
