@@ -186,7 +186,7 @@ class ProfileTab extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  user?.email ?? 'User',
+                  user?.displayName ?? user?.email ?? 'User',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ],
