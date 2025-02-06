@@ -55,6 +55,10 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
+          "fieldPath": "parentCommentId",
+          "order": "ASCENDING"
+        },
+        {
           "fieldPath": "videoId",
           "order": "ASCENDING"
         },

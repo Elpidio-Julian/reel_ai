@@ -108,7 +108,7 @@ class VideoCommentRepository {
 
       final snapshot = await query.get();
       return snapshot.docs
-          .map((doc) => VideoComment.fromMap(doc.data() as Map<String, dynamic>))
+          .map((doc) => VideoComment.fromMap(doc.data() as Map<String, dynamic>, doc.id))
           .toList();
     } catch (e) {
       throw VideoException(
@@ -142,7 +142,7 @@ class VideoCommentRepository {
 
       final snapshot = await query.get();
       return snapshot.docs
-          .map((doc) => VideoComment.fromMap(doc.data() as Map<String, dynamic>))
+          .map((doc) => VideoComment.fromMap(doc.data() as Map<String, dynamic>, doc.id))
           .toList();
     } catch (e) {
       throw VideoException(
@@ -162,7 +162,7 @@ class VideoCommentRepository {
         .limit(limit)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => VideoComment.fromMap(doc.data() as Map<String, dynamic>))
+            .map((doc) => VideoComment.fromMap(doc.data(), doc.id))
             .toList());
   }
 

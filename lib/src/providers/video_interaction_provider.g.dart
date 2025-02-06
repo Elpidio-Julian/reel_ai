@@ -7,7 +7,7 @@ part of 'video_interaction_provider.dart';
 // **************************************************************************
 
 String _$videoInteractionRepositoryHash() =>
-    r'052f9a9fd36701dfaf21b150d35a0a59d7ac6949';
+    r'4be5a17ca36160c8283d4a096de5fe607da6c35e';
 
 /// See also [videoInteractionRepository].
 @ProviderFor(videoInteractionRepository)
@@ -26,7 +26,7 @@ final videoInteractionRepositoryProvider =
 // ignore: unused_element
 typedef VideoInteractionRepositoryRef = ProviderRef<VideoInteractionRepository>;
 String _$hasUserInteractionHash() =>
-    r'51f0259d0d8ed0070fbd6d85c4952263e6995684';
+    r'0059eb94bd6bf8261c65d3f9230947f7ab868841';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -194,7 +194,7 @@ class _HasUserInteractionProviderElement
   String get type => (origin as HasUserInteractionProvider).type;
 }
 
-String _$videoStatsHash() => r'd499f8df2317c6259036973c5c00ca5647b2686f';
+String _$videoStatsHash() => r'8c5af541395d3d4513e220330134f9f97b129327';
 
 /// See also [videoStats].
 @ProviderFor(videoStats)
@@ -325,7 +325,7 @@ class _VideoStatsProviderElement
 }
 
 String _$userVideoInteractionsHash() =>
-    r'5c93c517fdea72bdcfec22ad7bf56b0f07ef7e14';
+    r'fdb696728421e0a5ea26a622bb333ca0ad0d1c68';
 
 /// See also [userVideoInteractions].
 @ProviderFor(userVideoInteractions)

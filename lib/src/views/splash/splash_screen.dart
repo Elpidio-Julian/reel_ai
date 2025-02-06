@@ -8,16 +8,35 @@ class SplashScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.listen(authStateProvider, (previous, next) {
-      next.whenData((user) {
+    // Watch auth state instead of just listening
+    final authState = ref.watch(authStateProvider);
+
+    // Handle all states
+    authState.whenOrNull(
+      data: (user) {
         if (context.mounted) {
-          Navigator.pushReplacementNamed(
-            context,
-            user != null ? Routes.home : Routes.login,
-          );
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Navigator.pushReplacementNamed(
+              context,
+              user != null ? Routes.home : Routes.login,
+            );
+          });
         }
-      });
-    });
+      },
+      error: (error, stackTrace) {
+        if (context.mounted) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error: ${error.toString()}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            Navigator.pushReplacementNamed(context, Routes.login);
+          });
+        }
+      },
+    );
 
     return Scaffold(
       backgroundColor: Theme.of(context).primaryColor,
@@ -50,9 +69,30 @@ class SplashScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 48),
-            // Loading indicator
-            const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            // Loading indicator with error state
+            authState.when(
+              data: (_) => const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+              loading: () => const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+              error: (error, _) => Column(
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    color: Colors.white,
+                    size: 48,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error loading app',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

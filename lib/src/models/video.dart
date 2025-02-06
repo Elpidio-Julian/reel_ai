@@ -24,6 +24,10 @@ class Video {
   final List<String>? hashtags; // New field for searchability
   final String? music; // New field for background music info
   final Map<String, dynamic>? metadata; // New field for additional metadata
+  final int likeCount;
+  final int commentCount;
+  final int shareCount;
+  final int savedCount;
 
   Video({
     required this.id,
@@ -40,6 +44,10 @@ class Video {
     this.hashtags,
     this.music,
     this.metadata,
+    this.likeCount = 0,
+    this.commentCount = 0,
+    this.shareCount = 0,
+    this.savedCount = 0,
   });
 
   Map<String, dynamic> toMap() {
@@ -58,6 +66,10 @@ class Video {
       'hashtags': hashtags,
       'music': music,
       'metadata': metadata,
+      'likeCount': likeCount,
+      'commentCount': commentCount,
+      'shareCount': shareCount,
+      'savedCount': savedCount,
     };
   }
 
@@ -77,6 +89,10 @@ class Video {
       hashtags: map['hashtags'] != null ? List<String>.from(map['hashtags'] as List) : null,
       music: map['music'] as String?,
       metadata: map['metadata'] as Map<String, dynamic>?,
+      likeCount: map['likeCount'] as int? ?? 0,
+      commentCount: map['commentCount'] as int? ?? 0,
+      shareCount: map['shareCount'] as int? ?? 0,
+      savedCount: map['savedCount'] as int? ?? 0,
     );
   }
 
@@ -95,6 +111,10 @@ class Video {
     List<String>? hashtags,
     String? music,
     Map<String, dynamic>? metadata,
+    int? likeCount,
+    int? commentCount,
+    int? shareCount,
+    int? savedCount,
   }) {
     return Video(
       id: id ?? this.id,
@@ -111,6 +131,10 @@ class Video {
       hashtags: hashtags ?? this.hashtags,
       music: music ?? this.music,
       metadata: metadata ?? this.metadata,
+      likeCount: likeCount ?? this.likeCount,
+      commentCount: commentCount ?? this.commentCount,
+      shareCount: shareCount ?? this.shareCount,
+      savedCount: savedCount ?? this.savedCount,
     );
   }
 }

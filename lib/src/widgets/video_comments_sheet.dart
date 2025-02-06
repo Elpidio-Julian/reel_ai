@@ -306,7 +306,7 @@ class _CommentTile extends ConsumerWidget {
                         children: [
                           const Icon(Icons.reply, size: 16),
                           const SizedBox(width: 4),
-                          Text(comment.replyCount.toString()),
+                          Text(comment.replies.toString()),
                         ],
                       ),
                     ),

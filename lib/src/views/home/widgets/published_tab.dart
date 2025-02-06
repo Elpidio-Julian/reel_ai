@@ -100,7 +100,9 @@ class _PublishedTabState extends ConsumerState<PublishedTab> {
 
   Future<void> _onPageChanged(int index, List<Video> videos) async {
     // Pause current video
-    _controllers[_currentIndex]?.pause();
+    if (_controllers[_currentIndex] != null) {
+      _controllers[_currentIndex]!.pause();
+    }
     
     setState(() {
       _currentIndex = index;
@@ -108,8 +110,8 @@ class _PublishedTabState extends ConsumerState<PublishedTab> {
 
     // Initialize and play new current video if not already initialized
     await _initializeController(index, videos[index].url);
-    if (!_isDisposed) {
-      _controllers[index]?.play();
+    if (!_isDisposed && _controllers[index] != null) {
+      _controllers[index]!.play();
     }
 
     // Preload adjacent videos
@@ -160,20 +162,20 @@ class _PublishedTabState extends ConsumerState<PublishedTab> {
               return null;
             });
           },
-          child: controller?.value.isInitialized == true
+          child: controller != null && controller.value.isInitialized
               ? GestureDetector(
                   onTap: () {
                     setState(() {
-                      if (controller?.value.isPlaying == true) {
-                        controller?.pause();
+                      if (controller.value.isPlaying) {
+                        controller.pause();
                       } else {
-                        controller?.play();
+                        controller.play();
                       }
                     });
                   },
                   child: Center(
                     child: AspectRatio(
-                      aspectRatio: controller!.value.aspectRatio,
+                      aspectRatio: controller.value.aspectRatio,
                       child: VideoPlayer(controller),
                     ),
                   ),
@@ -184,7 +186,7 @@ class _PublishedTabState extends ConsumerState<PublishedTab> {
         ),
 
         // Play/Pause indicator
-        if (controller?.value.isInitialized == true && controller?.value.isPlaying == false)
+        if (controller != null && controller.value.isInitialized && !controller.value.isPlaying)
           const Center(
             child: Icon(
               Icons.play_arrow,
@@ -198,9 +200,9 @@ class _PublishedTabState extends ConsumerState<PublishedTab> {
           top: 0,
           left: 0,
           right: 0,
-          child: controller?.value.isInitialized == true
+          child: controller != null && controller.value.isInitialized
               ? VideoProgressIndicator(
-                  controller!,
+                  controller,
                   allowScrubbing: true,
                   colors: const VideoProgressColors(
                     playedColor: Colors.white,

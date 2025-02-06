@@ -4,80 +4,79 @@ class VideoComment {
   final String id;
   final String videoId;
   final String userId;
+  final String? userDisplayName;
+  final String? userProfileImage;
   final String text;
   final DateTime timestamp;
   final int likeCount;
-  final int replyCount;
-  final String? parentCommentId; // null for top-level comments
-  final String? userDisplayName; // Cached user display name
-  final String? userProfileImage; // Cached user profile image
+  final String? parentCommentId;
+  final int replies;
 
   VideoComment({
     required this.id,
     required this.videoId,
     required this.userId,
+    this.userDisplayName,
+    this.userProfileImage,
     required this.text,
     required this.timestamp,
     this.likeCount = 0,
-    this.replyCount = 0,
     this.parentCommentId,
-    this.userDisplayName,
-    this.userProfileImage,
+    this.replies = 0,
   });
 
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'videoId': videoId,
-      'userId': userId,
-      'text': text,
-      'timestamp': Timestamp.fromDate(timestamp),
-      'likeCount': likeCount,
-      'replyCount': replyCount,
-      'parentCommentId': parentCommentId,
-      'userDisplayName': userDisplayName,
-      'userProfileImage': userProfileImage,
-    };
-  }
-
-  factory VideoComment.fromMap(Map<String, dynamic> map) {
+  factory VideoComment.fromMap(Map<String, dynamic> map, String id) {
     return VideoComment(
-      id: map['id'] as String,
+      id: id,
       videoId: map['videoId'] as String,
       userId: map['userId'] as String,
+      userDisplayName: map['userDisplayName'] as String?,
+      userProfileImage: map['userProfileImage'] as String?,
       text: map['text'] as String,
       timestamp: (map['timestamp'] as Timestamp).toDate(),
       likeCount: map['likeCount'] as int? ?? 0,
-      replyCount: map['replyCount'] as int? ?? 0,
       parentCommentId: map['parentCommentId'] as String?,
-      userDisplayName: map['userDisplayName'] as String?,
-      userProfileImage: map['userProfileImage'] as String?,
+      replies: map['replies'] as int? ?? 0,
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'videoId': videoId,
+      'userId': userId,
+      'userDisplayName': userDisplayName,
+      'userProfileImage': userProfileImage,
+      'text': text,
+      'timestamp': timestamp,
+      'likeCount': likeCount,
+      'parentCommentId': parentCommentId,
+      'replies': replies,
+    };
   }
 
   VideoComment copyWith({
     String? id,
     String? videoId,
     String? userId,
+    String? userDisplayName,
+    String? userProfileImage,
     String? text,
     DateTime? timestamp,
     int? likeCount,
-    int? replyCount,
     String? parentCommentId,
-    String? userDisplayName,
-    String? userProfileImage,
+    int? replies,
   }) {
     return VideoComment(
       id: id ?? this.id,
       videoId: videoId ?? this.videoId,
       userId: userId ?? this.userId,
+      userDisplayName: userDisplayName ?? this.userDisplayName,
+      userProfileImage: userProfileImage ?? this.userProfileImage,
       text: text ?? this.text,
       timestamp: timestamp ?? this.timestamp,
       likeCount: likeCount ?? this.likeCount,
-      replyCount: replyCount ?? this.replyCount,
       parentCommentId: parentCommentId ?? this.parentCommentId,
-      userDisplayName: userDisplayName ?? this.userDisplayName,
-      userProfileImage: userProfileImage ?? this.userProfileImage,
+      replies: replies ?? this.replies,
     );
   }
 } 

@@ -90,18 +90,29 @@ class FirebaseService {
 
   // Get user stream
   Stream<User?> get userStream {
-    return _auth.authStateChanges().asyncMap((firebaseUser) async {
+    return _auth.authStateChanges().map((firebaseUser) {
       if (firebaseUser == null) return null;
-      
-      // Force refresh the user data
-      await firebaseUser.reload();
-      final freshUser = _auth.currentUser;
-      if (freshUser == null) return null;
-
-      // Get updated user data from Firestore
-      final userData = await _userRepository.getUserById(freshUser.uid);
-      return userData ?? User.fromFirebaseUser(freshUser);
+      return User.fromFirebaseUser(firebaseUser);
+    }).handleError((error) {
+      debugPrint('Error in auth state stream: $error');
+      return null;
     });
+  }
+
+  // Separate method for refreshing user data
+  Future<void> refreshUserData() async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser != null) {
+        await currentUser.reload();
+        final userData = await _userRepository.getUserById(currentUser.uid);
+        if (userData != null) {
+          // Update local user data if needed
+        }
+      }
+    } catch (e) {
+      debugPrint('Error refreshing user data: $e');
+    }
   }
 
   // Update user profile

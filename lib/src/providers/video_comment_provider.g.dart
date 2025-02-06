@@ -7,7 +7,7 @@ part of 'video_comment_provider.dart';
 // **************************************************************************
 
 String _$videoCommentRepositoryHash() =>
-    r'3199f868b6e0f82c7299945c6a3136faf74950fb';
+    r'6448cfe3ed014462bfd78c4d2334748be686673d';
 
 /// See also [videoCommentRepository].
 @ProviderFor(videoCommentRepository)
@@ -25,7 +25,7 @@ final videoCommentRepositoryProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef VideoCommentRepositoryRef = ProviderRef<VideoCommentRepository>;
-String _$videoCommentsHash() => r'abe8283771677c374f505fef2832eedc365c62c1';
+String _$videoCommentsHash() => r'e1ea2e775fc80adea9e863f4125f3ea5df27ae93';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -195,7 +195,7 @@ class _VideoCommentsProviderElement
   int get limit => (origin as VideoCommentsProvider).limit;
 }
 
-String _$commentRepliesHash() => r'd2c308b526df10dfffd1502d22a5316ec0520bce';
+String _$commentRepliesHash() => r'4d63c9121f1c8979878d1c95af92bfab44672f3e';
 
 /// See also [commentReplies].
 @ProviderFor(commentReplies)
@@ -361,7 +361,7 @@ class _CommentRepliesProviderElement
 }
 
 String _$paginatedVideoCommentsHash() =>
-    r'f20b00d3cfe7c88d83db1ce2b13f804f7e7a3d3d';
+    r'2aaab7d577ccf9ea402695224e00c6a532617c09';
 
 /// See also [paginatedVideoComments].
 @ProviderFor(paginatedVideoComments)

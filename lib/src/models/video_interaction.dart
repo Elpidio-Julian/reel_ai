@@ -1,15 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class VideoInteraction {
-  static const String typeLike = 'like';
-  static const String typeShare = 'share';
-  static const String typeSave = 'save';
-
   final String id;
   final String videoId;
   final String userId;
   final String type;
   final DateTime timestamp;
+
+  static const String typeLike = 'like';
+  static const String typeSave = 'save';
 
   VideoInteraction({
     required this.id,
@@ -19,24 +18,23 @@ class VideoInteraction {
     required this.timestamp,
   });
 
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'videoId': videoId,
-      'userId': userId,
-      'type': type,
-      'timestamp': Timestamp.fromDate(timestamp),
-    };
-  }
-
-  factory VideoInteraction.fromMap(Map<String, dynamic> map) {
+  factory VideoInteraction.fromMap(Map<String, dynamic> map, String id) {
     return VideoInteraction(
-      id: map['id'] as String,
+      id: id,
       videoId: map['videoId'] as String,
       userId: map['userId'] as String,
       type: map['type'] as String,
       timestamp: (map['timestamp'] as Timestamp).toDate(),
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'videoId': videoId,
+      'userId': userId,
+      'type': type,
+      'timestamp': timestamp,
+    };
   }
 
   VideoInteraction copyWith({

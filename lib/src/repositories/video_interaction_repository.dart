@@ -125,7 +125,7 @@ class VideoInteractionRepository {
           .get();
 
       return snapshot.docs
-          .map((doc) => VideoInteraction.fromMap(doc.data() as Map<String, dynamic>))
+          .map((doc) => VideoInteraction.fromMap(doc.data(), doc.id))
           .toList();
     } catch (e) {
       throw VideoException(
