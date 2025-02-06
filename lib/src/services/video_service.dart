@@ -1,30 +1,50 @@
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import '../models/video.dart';
+import '../repositories/video_repository.dart';
+import '../utils/exceptions.dart';
 import 'package:path/path.dart' as path;
 import 'package:uuid/uuid.dart';
 
 class VideoService {
-  final FirebaseStorage _storage = FirebaseStorage.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
+  final FirebaseStorage _storage;
+  final VideoRepository _videoRepository;
+  final firebase_auth.FirebaseAuth _auth;
   UploadTask? _currentUploadTask;
   String? _currentVideoId;
 
   static const int _maxVideoSize = 100 * 1024 * 1024; // 100MB
   static const List<String> _supportedFormats = ['.mp4', '.mov', '.avi'];
 
-  Future<void> validateVideo(File videoFile) async {
-    final size = await videoFile.length();
-    if (size > _maxVideoSize) {
-      throw Exception('Video size exceeds 100MB limit');
-    }
+  VideoService({
+    FirebaseStorage? storage,
+    VideoRepository? videoRepository,
+    firebase_auth.FirebaseAuth? auth,
+  }) : _storage = storage ?? FirebaseStorage.instance,
+       _videoRepository = videoRepository ?? VideoRepository(),
+       _auth = auth ?? firebase_auth.FirebaseAuth.instance;
 
-    final ext = path.extension(videoFile.path).toLowerCase();
-    if (!_supportedFormats.contains(ext)) {
-      throw Exception('Unsupported video format. Supported formats: ${_supportedFormats.join(", ")}');
+  Future<void> validateVideo(File videoFile) async {
+    try {
+      final size = await videoFile.length();
+      if (size > _maxVideoSize) {
+        throw VideoException(
+          'Video size exceeds 100MB limit',
+          code: VideoException.videoTooLarge
+        );
+      }
+
+      final ext = path.extension(videoFile.path).toLowerCase();
+      if (!_supportedFormats.contains(ext)) {
+        throw VideoException(
+          'Unsupported video format. Supported formats: ${_supportedFormats.join(", ")}',
+          code: VideoException.unsupportedFormat
+        );
+      }
+    } catch (e) {
+      if (e is VideoException) rethrow;
+      throw VideoException('Failed to validate video: ${e.toString()}');
     }
   }
 
@@ -34,42 +54,42 @@ class VideoService {
   }) async {
     final user = _auth.currentUser;
     if (user == null) {
-      throw Exception('User not authenticated');
+      throw VideoException(
+        'User not authenticated',
+        code: VideoException.userNotAuthenticated
+      );
     }
 
-    // Validate video before upload
-    await validateVideo(videoFile);
-
-    // Generate unique ID for the video
-    final videoId = const Uuid().v4();
-    _currentVideoId = videoId;
-    final videoFileName = path.basename(videoFile.path);
-    final videoExt = path.extension(videoFileName);
-    
-    // Create storage reference
-    final videoRef = _storage.ref()
-        .child('videos')
-        .child(user.uid)
-        .child('$videoId$videoExt');
-
-    // Create video metadata
-    final video = Video(
-      id: videoId,
-      url: '', // Will be updated after upload
-      userId: user.uid,
-      createdAt: DateTime.now(),
-      description: description,
-      status: 'uploading',
-    );
-
-    // Save initial video metadata
-    await _firestore
-        .collection('videos')
-        .doc(videoId)
-        .set(video.toMap());
-
-    // Upload video file
     try {
+      // Validate video before upload
+      await validateVideo(videoFile);
+
+      // Generate unique ID for the video
+      final videoId = const Uuid().v4();
+      _currentVideoId = videoId;
+      final videoFileName = path.basename(videoFile.path);
+      final videoExt = path.extension(videoFileName);
+      
+      // Create storage reference
+      final videoRef = _storage.ref()
+          .child('videos')
+          .child(user.uid)
+          .child('$videoId$videoExt');
+
+      // Create video metadata
+      final video = Video(
+        id: videoId,
+        url: '', // Will be updated after upload
+        userId: user.uid,
+        createdAt: DateTime.now(),
+        description: description,
+        status: 'uploading',
+      );
+
+      // Save initial video metadata
+      await _videoRepository.saveVideo(video);
+
+      // Upload video file
       _currentUploadTask = videoRef.putFile(videoFile);
       
       // Listen to upload progress
@@ -87,99 +107,120 @@ class VideoService {
         status: 'ready',
       );
 
-      // Update video metadata in Firestore
-      await _firestore
-          .collection('videos')
-          .doc(videoId)
-          .update(updatedVideo.toMap());
+      // Update video metadata
+      await _videoRepository.updateVideoFromModel(updatedVideo);
 
       _currentUploadTask = null;
       _currentVideoId = null;
       return updatedVideo;
     } catch (e) {
-      // Update status to error if upload fails
-      await _firestore
-          .collection('videos')
-          .doc(videoId)
-          .update({'status': 'error'});
+      if (_currentVideoId != null) {
+        try {
+          // Update status to error if upload fails
+          await _videoRepository.updateVideo(_currentVideoId!, {'status': 'error'});
+        } catch (_) {
+          // Ignore cleanup errors
+        }
+      }
       
       _currentUploadTask = null;
       _currentVideoId = null;
-      rethrow;
+
+      if (e is VideoException) rethrow;
+      throw VideoException(
+        'Failed to upload video: ${e.toString()}',
+        code: VideoException.uploadFailed
+      );
     }
   }
 
   Future<void> cancelUpload() async {
     if (_currentUploadTask != null) {
-      await _currentUploadTask!.cancel();
-      _currentUploadTask = null;
+      try {
+        await _currentUploadTask!.cancel();
+        _currentUploadTask = null;
 
-      // Clean up Firestore document if it exists
-      if (_currentVideoId != null) {
-        try {
-          await _firestore
-              .collection('videos')
-              .doc(_currentVideoId)
-              .delete();
-        } catch (e) {
-          // Ignore cleanup errors
+        // Clean up video document if it exists
+        if (_currentVideoId != null) {
+          await _videoRepository.deleteVideo(_currentVideoId!);
+          _currentVideoId = null;
         }
-        _currentVideoId = null;
+      } catch (e) {
+        throw VideoException(
+          'Failed to cancel upload: ${e.toString()}',
+          code: VideoException.uploadFailed
+        );
       }
     }
   }
 
   Future<List<Video>> getUserVideos(String userId) async {
-    final snapshot = await _firestore
-        .collection('videos')
-        .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .get();
-
-    return snapshot.docs
-        .map((doc) => Video.fromMap(doc.data()))
-        .toList();
+    try {
+      return await _videoRepository.getVideosByUserId(userId);
+    } catch (e) {
+      if (e is VideoException) rethrow;
+      throw VideoException(
+        'Failed to get user videos: ${e.toString()}',
+        code: VideoException.videoNotFound
+      );
+    }
   }
 
   Future<void> deleteVideo(String videoId) async {
     final user = _auth.currentUser;
     if (user == null) {
-      throw Exception('User not authenticated');
+      throw VideoException(
+        'User not authenticated',
+        code: VideoException.userNotAuthenticated
+      );
     }
 
-    // Get video data
-    final videoDoc = await _firestore
-        .collection('videos')
-        .doc(videoId)
-        .get();
+    try {
+      // Get video data
+      final video = await _videoRepository.getVideoById(videoId);
+      if (video == null) {
+        throw VideoException(
+          'Video not found',
+          code: VideoException.videoNotFound
+        );
+      }
 
-    if (!videoDoc.exists) {
-      throw Exception('Video not found');
+      // Verify ownership
+      if (video.userId != user.uid) {
+        throw VideoException(
+          'Not authorized to delete this video',
+          code: VideoException.unauthorized
+        );
+      }
+
+      // Delete from storage
+      if (video.url.isNotEmpty) {
+        final videoRef = _storage.refFromURL(video.url);
+        await videoRef.delete();
+      }
+
+      // Delete thumbnail if exists
+      if (video.thumbnailUrl != null) {
+        final thumbnailRef = _storage.refFromURL(video.thumbnailUrl!);
+        await thumbnailRef.delete();
+      }
+
+      // Delete from Firestore
+      await _videoRepository.deleteVideo(videoId);
+    } catch (e) {
+      if (e is VideoException) rethrow;
+      throw VideoException(
+        'Failed to delete video: ${e.toString()}',
+        code: VideoException.deleteFailed
+      );
     }
+  }
 
-    final video = Video.fromMap(videoDoc.data()!);
+  Stream<Video?> getVideoStream(String videoId) {
+    return _videoRepository.getVideoStream(videoId);
+  }
 
-    // Verify ownership
-    if (video.userId != user.uid) {
-      throw Exception('Not authorized to delete this video');
-    }
-
-    // Delete from storage
-    if (video.url.isNotEmpty) {
-      final videoRef = _storage.refFromURL(video.url);
-      await videoRef.delete();
-    }
-
-    // Delete thumbnail if exists
-    if (video.thumbnailUrl != null) {
-      final thumbnailRef = _storage.refFromURL(video.thumbnailUrl!);
-      await thumbnailRef.delete();
-    }
-
-    // Delete from Firestore
-    await _firestore
-        .collection('videos')
-        .doc(videoId)
-        .delete();
+  Stream<List<Video>> getUserVideosStream(String userId) {
+    return _videoRepository.getUserVideosStream(userId);
   }
 }
