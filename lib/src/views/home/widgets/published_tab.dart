@@ -12,7 +12,10 @@ class PublishedTab extends ConsumerStatefulWidget {
 }
 
 class _PublishedTabState extends ConsumerState<PublishedTab> {
-  VideoPlayerController? _currentController;
+  // Keep track of three controllers for current, previous, and next videos
+  final Map<int, VideoPlayerController> _controllers = {};
+  int _currentIndex = 0;
+  bool _isDisposed = false;
 
   @override
   void initState() {
@@ -25,39 +28,102 @@ class _PublishedTabState extends ConsumerState<PublishedTab> {
 
   @override
   void dispose() {
-    _currentController?.dispose();
+    _isDisposed = true;
+    // Dispose all controllers
+    for (final controller in _controllers.values) {
+      controller.dispose();
+    }
+    _controllers.clear();
     super.dispose();
   }
 
-  Future<void> _initializeController(String videoUrl) async {
-    if (_currentController != null) {
-      await _currentController!.dispose();
+  Future<void> _initializeController(int index, String videoUrl) async {
+    if (_isDisposed) return;
+
+    // If controller already exists and is initialized, do nothing
+    if (_controllers.containsKey(index) && _controllers[index]!.value.isInitialized) {
+      return;
     }
 
-    _currentController = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
-    
+    final controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
+    _controllers[index] = controller;
+
     try {
-      await _currentController!.initialize();
-      await _currentController!.play();
-      await _currentController!.setLooping(true);
-      if (mounted) {
+      await controller.initialize();
+      await controller.setLooping(true);
+      
+      // Only play if this is the current video
+      if (index == _currentIndex && !_isDisposed) {
+        await controller.play();
         setState(() {});
       }
     } catch (e) {
-      debugPrint('Error initializing video controller: $e');
+      debugPrint('Error initializing video controller at index $index: $e');
     }
   }
 
-  Widget _buildVideoPlayer(Video video) {
+  void _preloadAdjacentVideos(List<Video> videos) {
+    // Preload previous video if it exists
+    if (_currentIndex > 0) {
+      _initializeController(_currentIndex - 1, videos[_currentIndex - 1].url);
+    }
+    
+    // Preload next video if it exists
+    if (_currentIndex < videos.length - 1) {
+      _initializeController(_currentIndex + 1, videos[_currentIndex + 1].url);
+    }
+  }
+
+  void _cleanupControllers(int currentIndex) {
+    // Keep only controllers for current, previous, and next videos
+    final validIndices = {
+      currentIndex - 1,
+      currentIndex,
+      currentIndex + 1,
+    };
+
+    _controllers.removeWhere((index, controller) {
+      if (!validIndices.contains(index)) {
+        controller.dispose();
+        return true;
+      }
+      return false;
+    });
+  }
+
+  Future<void> _onPageChanged(int index, List<Video> videos) async {
+    // Pause current video
+    _controllers[_currentIndex]?.pause();
+    
+    setState(() {
+      _currentIndex = index;
+    });
+
+    // Initialize and play new current video if not already initialized
+    await _initializeController(index, videos[index].url);
+    if (!_isDisposed) {
+      _controllers[index]?.play();
+    }
+
+    // Preload adjacent videos
+    _preloadAdjacentVideos(videos);
+    
+    // Cleanup old controllers
+    _cleanupControllers(index);
+  }
+
+  Widget _buildVideoPlayer(Video video, int index) {
+    final controller = _controllers[index];
+    
     return Stack(
       fit: StackFit.expand,
       children: [
         // Video Player
-        _currentController?.value.isInitialized == true
+        controller?.value.isInitialized == true
             ? Center(
                 child: AspectRatio(
-                  aspectRatio: _currentController!.value.aspectRatio,
-                  child: VideoPlayer(_currentController!),
+                  aspectRatio: controller!.value.aspectRatio,
+                  child: VideoPlayer(controller),
                 ),
               )
             : const Center(
@@ -110,16 +176,16 @@ class _PublishedTabState extends ConsumerState<PublishedTab> {
         GestureDetector(
           onTap: () {
             setState(() {
-              if (_currentController?.value.isPlaying == true) {
-                _currentController?.pause();
+              if (controller?.value.isPlaying == true) {
+                controller?.pause();
               } else {
-                _currentController?.play();
+                controller?.play();
               }
             });
           },
           child: Center(
             child: AnimatedOpacity(
-              opacity: _currentController?.value.isPlaying == true ? 0.0 : 1.0,
+              opacity: controller?.value.isPlaying == true ? 0.0 : 1.0,
               duration: const Duration(milliseconds: 200),
               child: Container(
                 padding: const EdgeInsets.all(8),
@@ -128,7 +194,7 @@ class _PublishedTabState extends ConsumerState<PublishedTab> {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  _currentController?.value.isPlaying == true
+                  controller?.value.isPlaying == true
                       ? Icons.pause
                       : Icons.play_arrow,
                   size: 50,
@@ -137,6 +203,24 @@ class _PublishedTabState extends ConsumerState<PublishedTab> {
               ),
             ),
           ),
+        ),
+
+        // Video Progress Indicator
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: controller?.value.isInitialized == true
+              ? VideoProgressIndicator(
+                  controller!,
+                  allowScrubbing: true,
+                  colors: const VideoProgressColors(
+                    playedColor: Colors.white,
+                    bufferedColor: Colors.white24,
+                    backgroundColor: Colors.black45,
+                  ),
+                )
+              : const SizedBox.shrink(),
         ),
       ],
     );
@@ -152,21 +236,18 @@ class _PublishedTabState extends ConsumerState<PublishedTab> {
           return const Center(child: Text('No published videos found'));
         }
 
+        // Initialize first video if not already initialized
+        if (_controllers.isEmpty) {
+          _initializeController(0, videos[0].url);
+          _preloadAdjacentVideos(videos);
+        }
+
         return PageView.builder(
           scrollDirection: Axis.vertical,
           itemCount: videos.length,
-          onPageChanged: (index) {
-            _initializeController(videos[index].url);
-          },
+          onPageChanged: (index) => _onPageChanged(index, videos),
           itemBuilder: (context, index) {
-            final video = videos[index];
-            
-            // Initialize the first video
-            if (index == 0 && _currentController == null) {
-              _initializeController(video.url);
-            }
-
-            return _buildVideoPlayer(video);
+            return _buildVideoPlayer(videos[index], index);
           },
         );
       },
