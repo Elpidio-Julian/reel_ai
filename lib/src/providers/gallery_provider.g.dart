@@ -7,11 +7,11 @@ part of 'gallery_provider.dart';
 // **************************************************************************
 
 String _$galleryVideoServiceHash() =>
-    r'18ab2333bfa164bbcc0021bfe2d4b16f57d8ca06';
+    r'9a2823e1ff5ae5867c46331221da20a99bdf0b9d';
 
 /// See also [galleryVideoService].
 @ProviderFor(galleryVideoService)
-final galleryVideoServiceProvider = AutoDisposeProvider<VideoService>.internal(
+final galleryVideoServiceProvider = Provider<VideoService>.internal(
   galleryVideoService,
   name: r'galleryVideoServiceProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
@@ -23,13 +23,13 @@ final galleryVideoServiceProvider = AutoDisposeProvider<VideoService>.internal(
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef GalleryVideoServiceRef = AutoDisposeProviderRef<VideoService>;
-String _$galleryControllerHash() => r'892b4341f183b57ed1be4694722e40a079321d8a';
+typedef GalleryVideoServiceRef = ProviderRef<VideoService>;
+String _$galleryControllerHash() => r'5a55ed4ecb283902d2106fcb94c7957a97fae9be';
 
 /// See also [GalleryController].
 @ProviderFor(GalleryController)
 final galleryControllerProvider =
-    AutoDisposeAsyncNotifierProvider<GalleryController, List<Video>>.internal(
+    AsyncNotifierProvider<GalleryController, List<Video>>.internal(
   GalleryController.new,
   name: r'galleryControllerProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
@@ -39,6 +39,6 @@ final galleryControllerProvider =
   allTransitiveDependencies: null,
 );
 
-typedef _$GalleryController = AutoDisposeAsyncNotifier<List<Video>>;
+typedef _$GalleryController = AsyncNotifier<List<Video>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

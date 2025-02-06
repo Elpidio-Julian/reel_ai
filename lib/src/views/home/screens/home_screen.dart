@@ -5,7 +5,7 @@ import '../../../providers/auth_state.dart';
 import '../../../widgets/loading_overlay.dart';
 import '../widgets/gallery_tab.dart';
 import '../widgets/editor_tab.dart';
-import '../widgets/publish_tab.dart';
+import '../widgets/published_tab.dart';
 import '../widgets/profile_tab.dart';
 import '../widgets/upload_tab.dart';
 
@@ -60,7 +60,7 @@ class HomeScreen extends ConsumerWidget {
       const UploadTab(),
       const GalleryTab(),
       const EditorTab(),
-      const PublishTab(),
+      const PublishedTab(),
       const ProfileTab(),
     ];
 
@@ -94,8 +94,8 @@ class HomeScreen extends ConsumerWidget {
                 label: 'Editor',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.publish),
-                label: 'Publish',
+                icon: Icon(Icons.explore),
+                label: 'Discover',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.person),
