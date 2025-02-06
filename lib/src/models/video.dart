@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'video_stats.dart';
 
 class Video {
   // Video status constants
@@ -16,6 +17,13 @@ class Video {
   final String? description;
   final String status; // uploading, processing, ready, published, error, draft
   final String? thumbnailUrl;
+  final VideoStats? stats; // New field for stats
+  final String? userDisplayName; // Cached user display name
+  final String? userProfileImage; // Cached user profile image
+  final bool commentsEnabled; // New field to control comments
+  final List<String>? hashtags; // New field for searchability
+  final String? music; // New field for background music info
+  final Map<String, dynamic>? metadata; // New field for additional metadata
 
   Video({
     required this.id,
@@ -25,6 +33,13 @@ class Video {
     this.description,
     required this.status,
     this.thumbnailUrl,
+    this.stats,
+    this.userDisplayName,
+    this.userProfileImage,
+    this.commentsEnabled = true,
+    this.hashtags,
+    this.music,
+    this.metadata,
   });
 
   Map<String, dynamic> toMap() {
@@ -36,6 +51,13 @@ class Video {
       'description': description,
       'status': status,
       'thumbnailUrl': thumbnailUrl,
+      'stats': stats?.toMap(),
+      'userDisplayName': userDisplayName,
+      'userProfileImage': userProfileImage,
+      'commentsEnabled': commentsEnabled,
+      'hashtags': hashtags,
+      'music': music,
+      'metadata': metadata,
     };
   }
 
@@ -48,6 +70,13 @@ class Video {
       description: map['description'] as String?,
       status: map['status'] as String,
       thumbnailUrl: map['thumbnailUrl'] as String?,
+      stats: map['stats'] != null ? VideoStats.fromMap(map['stats'] as Map<String, dynamic>) : null,
+      userDisplayName: map['userDisplayName'] as String?,
+      userProfileImage: map['userProfileImage'] as String?,
+      commentsEnabled: map['commentsEnabled'] as bool? ?? true,
+      hashtags: map['hashtags'] != null ? List<String>.from(map['hashtags'] as List) : null,
+      music: map['music'] as String?,
+      metadata: map['metadata'] as Map<String, dynamic>?,
     );
   }
 
@@ -59,6 +88,13 @@ class Video {
     String? description,
     String? status,
     String? thumbnailUrl,
+    VideoStats? stats,
+    String? userDisplayName,
+    String? userProfileImage,
+    bool? commentsEnabled,
+    List<String>? hashtags,
+    String? music,
+    Map<String, dynamic>? metadata,
   }) {
     return Video(
       id: id ?? this.id,
@@ -68,6 +104,13 @@ class Video {
       description: description ?? this.description,
       status: status ?? this.status,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      stats: stats ?? this.stats,
+      userDisplayName: userDisplayName ?? this.userDisplayName,
+      userProfileImage: userProfileImage ?? this.userProfileImage,
+      commentsEnabled: commentsEnabled ?? this.commentsEnabled,
+      hashtags: hashtags ?? this.hashtags,
+      music: music ?? this.music,
+      metadata: metadata ?? this.metadata,
     );
   }
 }

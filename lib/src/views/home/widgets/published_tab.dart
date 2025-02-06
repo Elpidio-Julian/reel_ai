@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 import '../../../models/video.dart';
+import '../../../models/video_interaction.dart';
 import '../../../providers/published_videos_provider.dart';
+import '../../../providers/video_interaction_provider.dart';
+import '../../../widgets/video_action_bar.dart';
+import '../../../widgets/video_comments_sheet.dart';
+import '../../../widgets/video_share_sheet.dart';
+import '../../../widgets/double_tap_like_overlay.dart';
 
 class PublishedTab extends ConsumerStatefulWidget {
   const PublishedTab({super.key});
@@ -112,100 +119,81 @@ class _PublishedTabState extends ConsumerState<PublishedTab> {
     _cleanupControllers(index);
   }
 
+  void _showComments(Video video) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => VideoCommentsSheet(video: video),
+    );
+  }
+
+  void _showShareMenu(Video video) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => VideoShareSheet(video: video),
+    );
+  }
+
   Widget _buildVideoPlayer(Video video, int index) {
     final controller = _controllers[index];
     
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Video Player
-        controller?.value.isInitialized == true
-            ? Center(
-                child: AspectRatio(
-                  aspectRatio: controller!.value.aspectRatio,
-                  child: VideoPlayer(controller),
-                ),
-              )
-            : const Center(
-                child: CircularProgressIndicator(color: Colors.white),
-              ),
-
-        // User Info Overlay (bottom)
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withValues(alpha: 179, red: 0, green: 0, blue: 0),
-                ],
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'User: ${video.userId}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+        // Video Player with double tap like overlay
+        DoubleTapLikeOverlay(
+          onLike: () {
+            HapticFeedback.mediumImpact();
+            ref.read(videoInteractionControllerProvider.notifier)
+                .addInteraction(video.id, VideoInteraction.typeLike)
+                .catchError((e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Unable to like video. Please try again later.'),
+                    duration: Duration(seconds: 2),
                   ),
-                ),
-                if (video.description != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    video.description!,
-                    style: const TextStyle(color: Colors.white),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-
-        // Play/Pause Overlay (center)
-        GestureDetector(
-          onTap: () {
-            setState(() {
-              if (controller?.value.isPlaying == true) {
-                controller?.pause();
-              } else {
-                controller?.play();
+                );
               }
+              return null;
             });
           },
-          child: Center(
-            child: AnimatedOpacity(
-              opacity: controller?.value.isPlaying == true ? 0.0 : 1.0,
-              duration: const Duration(milliseconds: 200),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 128, red: 0, green: 0, blue: 0),
-                  shape: BoxShape.circle,
+          child: controller?.value.isInitialized == true
+              ? GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      if (controller?.value.isPlaying == true) {
+                        controller?.pause();
+                      } else {
+                        controller?.play();
+                      }
+                    });
+                  },
+                  child: Center(
+                    child: AspectRatio(
+                      aspectRatio: controller!.value.aspectRatio,
+                      child: VideoPlayer(controller),
+                    ),
+                  ),
+                )
+              : const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
                 ),
-                child: Icon(
-                  controller?.value.isPlaying == true
-                      ? Icons.pause
-                      : Icons.play_arrow,
-                  size: 50,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
         ),
 
-        // Video Progress Indicator
+        // Play/Pause indicator
+        if (controller?.value.isInitialized == true && controller?.value.isPlaying == false)
+          const Center(
+            child: Icon(
+              Icons.play_arrow,
+              size: 80,
+              color: Colors.white70,
+            ),
+          ),
+
+        // Video progress indicator
         Positioned(
           top: 0,
           left: 0,
@@ -221,6 +209,88 @@ class _PublishedTabState extends ConsumerState<PublishedTab> {
                   ),
                 )
               : const SizedBox.shrink(),
+        ),
+
+        // Action bar
+        Positioned(
+          right: 0,
+          bottom: 80,
+          child: VideoActionBar(
+            video: video,
+            onCommentTap: () => _showComments(video),
+            onShareTap: () => _showShareMenu(video),
+          ),
+        ),
+
+        // Video info overlay
+        Positioned(
+          left: 16,
+          right: 88,
+          bottom: 16,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (video.userDisplayName != null)
+                Row(
+                  children: [
+                    if (video.userProfileImage != null)
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundImage: NetworkImage(video.userProfileImage!),
+                      )
+                    else
+                      CircleAvatar(
+                        radius: 16,
+                        child: Text(video.userDisplayName![0].toUpperCase()),
+                      ),
+                    const SizedBox(width: 8),
+                    Text(
+                      video.userDisplayName!,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              if (video.description != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  video.description!,
+                  style: const TextStyle(color: Colors.white),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              if (video.hashtags != null && video.hashtags!.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  video.hashtags!.map((tag) => '#$tag').join(' '),
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 230, red: 255, green: 255, blue: 255),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+              if (video.music != null) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.music_note,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      video.music!,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
         ),
       ],
     );
