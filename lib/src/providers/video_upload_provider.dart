@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/video_service.dart';
 
@@ -11,6 +12,7 @@ class VideoUploadState {
   final File? selectedVideo;
   final String? description;
   final bool isUploading;
+  final double? uploadProgress;
 
   const VideoUploadState({
     this.isLoading = false,
@@ -18,6 +20,7 @@ class VideoUploadState {
     this.selectedVideo,
     this.description,
     this.isUploading = false,
+    this.uploadProgress,
   });
 
   VideoUploadState copyWith({
@@ -26,6 +29,7 @@ class VideoUploadState {
     File? selectedVideo,
     String? description,
     bool? isUploading,
+    double? uploadProgress,
   }) {
     return VideoUploadState(
       isLoading: isLoading ?? this.isLoading,
@@ -33,12 +37,13 @@ class VideoUploadState {
       selectedVideo: selectedVideo ?? this.selectedVideo,
       description: description ?? this.description,
       isUploading: isUploading ?? this.isUploading,
+      uploadProgress: uploadProgress ?? this.uploadProgress,
     );
   }
 }
 
 @Riverpod(keepAlive: true)
-VideoService videoService(VideoServiceRef ref) {
+VideoService videoService(Ref ref) {
   return VideoService();
 }
 
@@ -98,24 +103,60 @@ class VideoUploadController extends _$VideoUploadController {
       return;
     }
 
-    state = state.copyWith(isUploading: true);
     try {
       final videoServiceInstance = ref.read(videoServiceProvider);
+      
+      // Validate video before starting upload
+      await videoServiceInstance.validateVideo(state.selectedVideo!);
+      
+      state = state.copyWith(
+        isUploading: true,
+        error: null,
+        uploadProgress: 0,
+      );
+
       await videoServiceInstance.uploadVideo(
         state.selectedVideo!,
         description: state.description,
+        onProgress: (progress) {
+          state = state.copyWith(uploadProgress: progress);
+        },
       );
-      
-      state = state.copyWith(
-        isUploading: false,
-        selectedVideo: null,
-        description: null,
-      );
+
+      // Clear state after successful upload
+      state = const VideoUploadState();
     } catch (e) {
       state = state.copyWith(
-        error: 'Failed to upload video: $e',
+        error: e.toString(),
         isUploading: false,
+        uploadProgress: null,
       );
     }
+  }
+
+  Future<void> retryUpload() async {
+    if (!state.isUploading && state.selectedVideo != null) {
+      state = state.copyWith(error: null);
+      await uploadVideo();
+    }
+  }
+
+  Future<void> cancelUpload() async {
+    if (state.isUploading) {
+      final videoServiceInstance = ref.read(videoServiceProvider);
+      await videoServiceInstance.cancelUpload();
+      state = state.copyWith(
+        isUploading: false,
+        uploadProgress: null,
+      );
+    }
+  }
+
+  void removeSelectedVideo() {
+    state = state.copyWith(
+      selectedVideo: null,
+      description: null,
+      error: null,
+    );
   }
 }

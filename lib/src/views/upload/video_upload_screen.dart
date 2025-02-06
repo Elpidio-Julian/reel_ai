@@ -1,10 +1,17 @@
+// Dart imports
 import 'dart:io';
+
+// Flutter imports
 import 'package:flutter/material.dart';
+
+// Third-party package imports
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../providers/video_upload_provider.dart';
-import 'package:video_player/video_player.dart';
-import 'camera_recording_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:video_player/video_player.dart';
+
+// Local imports
+import '../../providers/video_upload_provider.dart';
+import '../camera/camera_recording_screen.dart';
 
 class VideoUploadScreen extends ConsumerStatefulWidget {
   const VideoUploadScreen({super.key});
@@ -16,6 +23,7 @@ class VideoUploadScreen extends ConsumerStatefulWidget {
 class _VideoUploadScreenState extends ConsumerState<VideoUploadScreen> {
   VideoPlayerController? _controller;
   bool _isInitializing = false;
+  final TextEditingController _descriptionController = TextEditingController();
 
   @override
   void initState() {
@@ -25,6 +33,7 @@ class _VideoUploadScreenState extends ConsumerState<VideoUploadScreen> {
   @override
   void dispose() {
     _controller?.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 
@@ -87,7 +96,7 @@ class _VideoUploadScreenState extends ConsumerState<VideoUploadScreen> {
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
+            children: [
               ListTile(
                 leading: const Icon(Icons.photo_library),
                 title: const Text('Choose from Gallery'),
@@ -141,6 +150,21 @@ class _VideoUploadScreenState extends ConsumerState<VideoUploadScreen> {
     }
   }
 
+  void _handleUpload() {
+    final description = _descriptionController.text.trim();
+    ref.read(videoUploadControllerProvider.notifier)
+      .updateDescription(description);
+    ref.read(videoUploadControllerProvider.notifier)
+      .uploadVideo();
+  }
+
+  void _handleRemoveVideo() {
+    _controller?.pause();
+    _controller?.dispose();
+    ref.read(videoUploadControllerProvider.notifier)
+      .removeSelectedVideo();
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(videoUploadControllerProvider);
@@ -160,8 +184,28 @@ class _VideoUploadScreenState extends ConsumerState<VideoUploadScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (state.isLoading)
-              const Center(child: CircularProgressIndicator())
-            else if (_controller != null && _controller!.value.isInitialized)
+              const LinearProgressIndicator(),
+            if (state.isUploading && state.uploadProgress != null)
+              Column(
+                children: [
+                  LinearProgressIndicator(value: state.uploadProgress),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${(state.uploadProgress! * 100).toStringAsFixed(1)}%',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            if (state.error != null)
+              Container(
+                padding: const EdgeInsets.all(8),
+                color: Colors.red.shade100,
+                child: Text(
+                  state.error!,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
+            if (_controller != null && _controller!.value.isInitialized)
               AspectRatio(
                 aspectRatio: _controller!.value.aspectRatio,
                 child: Stack(
@@ -183,60 +227,81 @@ class _VideoUploadScreenState extends ConsumerState<VideoUploadScreen> {
                           });
                         },
                       ),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                        ),
+                        onPressed: _handleRemoveVideo,
+                      ),
+                    ),
                   ],
                 ),
               )
-            else
+            else if (!state.isLoading && !state.isUploading)
               const Center(
                 child: Text('Select or record a video to upload'),
               ),
             const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: state.isLoading ? null : _showVideoOptions,
-              icon: const Icon(Icons.add_circle_outline),
-              label: const Text('Add Video'),
-            ),
             if (state.selectedVideo != null) ...[
-              const SizedBox(height: 16),
               TextField(
+                controller: _descriptionController,
                 decoration: const InputDecoration(
-                  labelText: 'Description',
+                  labelText: 'Description (optional)',
                   border: OutlineInputBorder(),
                 ),
                 maxLines: 3,
-                onChanged: (value) => ref.read(videoUploadControllerProvider.notifier).updateDescription(value),
               ),
               const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: state.isUploading
-                    ? null
-                    : () => ref.read(videoUploadControllerProvider.notifier).uploadVideo(),
-                child: state.isUploading
-                    ? const CircularProgressIndicator()
-                    : const Text('Upload Video'),
-              ),
             ],
-            if (state.error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: Text(
-                  state.error!,
-                  style: const TextStyle(color: Colors.red),
-                  textAlign: TextAlign.center,
+            ElevatedButton(
+              onPressed: state.isLoading || state.isUploading 
+                ? null 
+                : _showVideoOptions,
+              child: const Text('Add Video'),
+            ),
+            if (state.selectedVideo != null) ...[
+              const SizedBox(height: 16),
+              if (state.isUploading)
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          ref.read(videoUploadControllerProvider.notifier)
+                            .cancelUpload();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                        ),
+                        child: const Text('Cancel Upload'),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: _handleUpload,
+                        child: const Text('Upload Video'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.delete),
+                      onPressed: _handleRemoveVideo,
+                    ),
+                  ],
                 ),
-              ),
+            ],
           ],
         ),
       ),
-      floatingActionButton: state.selectedVideo != null
-        ? FloatingActionButton(
-            onPressed: () {
-              _controller?.pause();
-              ref.read(videoUploadControllerProvider.notifier).clearVideo();
-            },
-            child: const Icon(Icons.close),
-          )
-        : null,
     );
   }
-}
+} 

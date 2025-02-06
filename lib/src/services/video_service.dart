@@ -10,15 +10,39 @@ class VideoService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
+  UploadTask? _currentUploadTask;
+  String? _currentVideoId;
 
-  Future<Video> uploadVideo(File videoFile, {String? description}) async {
+  static const int _maxVideoSize = 100 * 1024 * 1024; // 100MB
+  static const List<String> _supportedFormats = ['.mp4', '.mov', '.avi'];
+
+  Future<void> validateVideo(File videoFile) async {
+    final size = await videoFile.length();
+    if (size > _maxVideoSize) {
+      throw Exception('Video size exceeds 100MB limit');
+    }
+
+    final ext = path.extension(videoFile.path).toLowerCase();
+    if (!_supportedFormats.contains(ext)) {
+      throw Exception('Unsupported video format. Supported formats: ${_supportedFormats.join(", ")}');
+    }
+  }
+
+  Future<Video> uploadVideo(File videoFile, {
+    String? description,
+    void Function(double)? onProgress,
+  }) async {
     final user = _auth.currentUser;
     if (user == null) {
       throw Exception('User not authenticated');
     }
 
+    // Validate video before upload
+    await validateVideo(videoFile);
+
     // Generate unique ID for the video
     final videoId = const Uuid().v4();
+    _currentVideoId = videoId;
     final videoFileName = path.basename(videoFile.path);
     final videoExt = path.extension(videoFileName);
     
@@ -46,7 +70,15 @@ class VideoService {
 
     // Upload video file
     try {
-      final uploadTask = await videoRef.putFile(videoFile);
+      _currentUploadTask = videoRef.putFile(videoFile);
+      
+      // Listen to upload progress
+      _currentUploadTask!.snapshotEvents.listen((TaskSnapshot snapshot) {
+        final progress = snapshot.bytesTransferred / snapshot.totalBytes;
+        onProgress?.call(progress);
+      });
+
+      final uploadTask = await _currentUploadTask!;
       final downloadUrl = await uploadTask.ref.getDownloadURL();
 
       // Update video with URL and status
@@ -61,6 +93,8 @@ class VideoService {
           .doc(videoId)
           .update(updatedVideo.toMap());
 
+      _currentUploadTask = null;
+      _currentVideoId = null;
       return updatedVideo;
     } catch (e) {
       // Update status to error if upload fails
@@ -69,7 +103,29 @@ class VideoService {
           .doc(videoId)
           .update({'status': 'error'});
       
+      _currentUploadTask = null;
+      _currentVideoId = null;
       rethrow;
+    }
+  }
+
+  Future<void> cancelUpload() async {
+    if (_currentUploadTask != null) {
+      await _currentUploadTask!.cancel();
+      _currentUploadTask = null;
+
+      // Clean up Firestore document if it exists
+      if (_currentVideoId != null) {
+        try {
+          await _firestore
+              .collection('videos')
+              .doc(_currentVideoId)
+              .delete();
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+        _currentVideoId = null;
+      }
     }
   }
 

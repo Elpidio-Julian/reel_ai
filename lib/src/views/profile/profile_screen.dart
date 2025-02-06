@@ -13,13 +13,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _selectedIndex = 0;
 
   // Titles for bottom navigation items (for reference)
-  static const List<String> _titles = [
-    'Camera/Upload',
-    'Gallery',
-    'Editor',
-    'Publish',
-    'Profile Options',
-  ];
+  // static const List<String> _titles = [
+  //   'Camera/Upload',
+  //   'Gallery',
+  //   'Editor',
+  //   'Publish',
+  //   'Profile Options',
+  // ];
 
   // Placeholder widget for each tab
   static const List<Widget> _widgetOptions = <Widget>[

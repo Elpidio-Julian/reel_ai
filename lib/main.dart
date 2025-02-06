@@ -3,15 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'src/routes.dart';
-import 'src/views/auth/login_screen.dart';
-import 'src/views/auth/register_screen.dart';
-import 'src/views/profile/profile_screen.dart';
-import 'src/views/camera/camera_recording_screen.dart';
-import 'src/views/camera/video_upload_screen.dart';
 import 'src/views/splash/splash_screen.dart';
 import 'firebase_options.dart';
 import 'src/config/env_config.dart';
-import 'src/providers/auth_state.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,8 +37,6 @@ class MyApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authStateProvider);
-
     return MaterialApp(
       title: 'ReelAI',
       theme: ThemeData(
@@ -52,13 +44,7 @@ class MyApp extends ConsumerWidget {
         useMaterial3: true,
       ),
       home: const SplashScreen(),
-      routes: {
-        Routes.login: (context) => const LoginScreen(),
-        Routes.register: (context) => const RegisterScreen(),
-        Routes.profile: (context) => const ProfileScreen(),
-        Routes.camera: (context) => const CameraRecordingScreen(),
-        Routes.upload: (context) => const VideoUploadScreen(),
-      },
+      routes: Routes.getRoutes(),
     );
   }
 }
