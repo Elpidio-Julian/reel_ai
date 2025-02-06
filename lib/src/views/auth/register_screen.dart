@@ -25,7 +25,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authState = ref.read(authStateProvider);
       if (authState.hasValue && authState.value != null) {
-        Navigator.pushReplacementNamed(context, Routes.profile);
+        Navigator.pushReplacementNamed(context, Routes.home);
       }
     });
   }
@@ -49,7 +49,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         if (mounted) {
           final authState = ref.read(authStateProvider);
           if (authState.hasValue && authState.value != null) {
-            Navigator.pushReplacementNamed(context, Routes.profile);
+            Navigator.pushReplacementNamed(context, Routes.home);
           }
         }
       } catch (e) {

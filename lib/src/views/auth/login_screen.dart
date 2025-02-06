@@ -23,7 +23,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authState = ref.read(authStateProvider);
       if (authState.hasValue && authState.value != null) {
-        Navigator.pushReplacementNamed(context, Routes.profile);
+        Navigator.pushReplacementNamed(context, Routes.home);
       }
     });
   }
@@ -46,7 +46,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         if (mounted) {
           final authState = ref.read(authStateProvider);
           if (authState.hasValue && authState.value != null) {
-            Navigator.pushReplacementNamed(context, Routes.profile);
+            Navigator.pushReplacementNamed(context, Routes.home);
           }
         }
       } catch (e) {

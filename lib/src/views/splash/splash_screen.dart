@@ -13,7 +13,7 @@ class SplashScreen extends ConsumerWidget {
         if (context.mounted) {
           Navigator.pushReplacementNamed(
             context,
-            user != null ? Routes.profile : Routes.login,
+            user != null ? Routes.home : Routes.login,
           );
         }
       });
