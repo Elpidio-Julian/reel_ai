@@ -27,6 +27,10 @@ class VideoException implements Exception {
   static const String unauthorized = 'unauthorized';
   static const String uploadFailed = 'upload-failed';
   static const String deleteFailed = 'delete-failed';
+  static const String invalidOperation = 'invalid-operation';
+  static const String publishFailed = 'publish-failed';
+  static const String unpublishFailed = 'unpublish-failed';
+  static const String indexBuilding = 'index-building';
   
   final String message;
   final String? code;
@@ -53,6 +57,8 @@ class VideoException implements Exception {
         return 'Failed to upload video';
       case deleteFailed:
         return 'Failed to delete video';
+      case indexBuilding:
+        return 'Please wait while we set up the video gallery (this may take a few minutes)';
       default:
         return 'An error occurred with the video';
     }

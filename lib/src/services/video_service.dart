@@ -83,7 +83,7 @@ class VideoService {
         userId: user.uid,
         createdAt: DateTime.now(),
         description: description,
-        status: 'uploading',
+        status: Video.statusUploading,
       );
 
       // Save initial video metadata
@@ -222,5 +222,138 @@ class VideoService {
 
   Stream<List<Video>> getUserVideosStream(String userId) {
     return _videoRepository.getUserVideosStream(userId);
+  }
+
+  Future<Video> publishVideo(String videoId) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw VideoException(
+        'User not authenticated',
+        code: VideoException.userNotAuthenticated
+      );
+    }
+
+    try {
+      final video = await _videoRepository.getVideoById(videoId);
+      if (video == null) {
+        throw VideoException(
+          'Video not found',
+          code: VideoException.videoNotFound
+        );
+      }
+
+      if (video.userId != user.uid) {
+        throw VideoException(
+          'Not authorized to publish this video',
+          code: VideoException.unauthorized
+        );
+      }
+
+      if (video.status != Video.statusReady && video.status != Video.statusDraft) {
+        throw VideoException(
+          'Video must be ready before publishing',
+          code: VideoException.invalidOperation
+        );
+      }
+
+      final updatedVideo = video.copyWith(status: Video.statusPublished);
+      await _videoRepository.updateVideoFromModel(updatedVideo);
+      return updatedVideo;
+    } catch (e) {
+      if (e is VideoException) rethrow;
+      throw VideoException(
+        'Failed to publish video: ${e.toString()}',
+        code: VideoException.publishFailed
+      );
+    }
+  }
+
+  Future<Video> unpublishVideo(String videoId) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw VideoException(
+        'User not authenticated',
+        code: VideoException.userNotAuthenticated
+      );
+    }
+
+    try {
+      final video = await _videoRepository.getVideoById(videoId);
+      if (video == null) {
+        throw VideoException(
+          'Video not found',
+          code: VideoException.videoNotFound
+        );
+      }
+
+      if (video.userId != user.uid) {
+        throw VideoException(
+          'Not authorized to unpublish this video',
+          code: VideoException.unauthorized
+        );
+      }
+
+      if (video.status != Video.statusPublished) {
+        throw VideoException(
+          'Video is not published',
+          code: VideoException.invalidOperation
+        );
+      }
+
+      final updatedVideo = video.copyWith(status: Video.statusDraft);
+      await _videoRepository.updateVideoFromModel(updatedVideo);
+      return updatedVideo;
+    } catch (e) {
+      if (e is VideoException) rethrow;
+      throw VideoException(
+        'Failed to unpublish video: ${e.toString()}',
+        code: VideoException.unpublishFailed
+      );
+    }
+  }
+
+  // Get published videos for all users
+  Future<List<Video>> getPublishedVideos() async {
+    try {
+      return await _videoRepository.getVideosByStatus(Video.statusPublished);
+    } catch (e) {
+      if (e is VideoException) rethrow;
+      throw VideoException(
+        'Failed to get published videos: ${e.toString()}',
+        code: VideoException.videoNotFound
+      );
+    }
+  }
+
+  // Get user's published videos
+  Future<List<Video>> getUserPublishedVideos(String userId) async {
+    try {
+      return await _videoRepository.getVideosByUserIdAndStatus(
+        userId,
+        Video.statusPublished
+      );
+    } catch (e) {
+      if (e is VideoException) rethrow;
+      throw VideoException(
+        'Failed to get user published videos: ${e.toString()}',
+        code: VideoException.videoNotFound
+      );
+    }
+  }
+
+  // Get user's draft videos
+  Future<List<Video>> getUserDraftVideos(String userId) async {
+    try {
+      return await _videoRepository.getVideosByUserIdAndStatus(
+        userId,
+        Video.statusDraft
+      );
+    } catch (e) {
+      if (e is VideoException) rethrow;
+      throw VideoException(
+        'Failed to get user draft videos: ${e.toString()}',
+        code: VideoException.videoNotFound
+      );
+    }
   }
 }

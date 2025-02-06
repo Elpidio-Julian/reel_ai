@@ -1,12 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Video {
+  // Video status constants
+  static const String statusUploading = 'uploading';
+  static const String statusProcessing = 'processing';
+  static const String statusReady = 'ready';
+  static const String statusPublished = 'published';
+  static const String statusError = 'error';
+  static const String statusDraft = 'draft';
+
   final String id;
   final String url;
   final String userId;
   final DateTime createdAt;
   final String? description;
-  final String status; // uploading, processing, ready
+  final String status; // uploading, processing, ready, published, error, draft
   final String? thumbnailUrl;
 
   Video({
