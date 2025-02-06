@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:video_player/video_player.dart';
 import '../../../providers/video_upload_provider.dart';
+import '../../../widgets/success_notification.dart';
 import '../../camera/camera_recording_screen.dart';
 
 class UploadTab extends ConsumerStatefulWidget {
@@ -123,6 +124,24 @@ class _UploadTabState extends ConsumerState<UploadTab> {
     }
   }
 
+  Future<void> _handleUpload() async {
+    final notifier = ref.read(videoUploadControllerProvider.notifier);
+    notifier.updateDescription(_descriptionController.text.trim());
+    await notifier.uploadVideo();
+
+    // Check if the upload was successful (no error in state)
+    final currentState = ref.read(videoUploadControllerProvider);
+    if (currentState.error == null && mounted) {
+      SuccessNotification.show(
+        context,
+        message: 'Video uploaded successfully!',
+        onDismiss: () {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        },
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final uploadState = ref.watch(videoUploadControllerProvider);
@@ -215,12 +234,7 @@ class _UploadTabState extends ConsumerState<UploadTab> {
                       ElevatedButton.icon(
                         onPressed: uploadState.isUploading
                             ? null
-                            : () {
-                                ref.read(videoUploadControllerProvider.notifier)
-                                  .updateDescription(_descriptionController.text.trim());
-                                ref.read(videoUploadControllerProvider.notifier)
-                                  .uploadVideo();
-                              },
+                            : _handleUpload,
                         icon: const Icon(Icons.upload),
                         label: const Text('Upload'),
                       ),
