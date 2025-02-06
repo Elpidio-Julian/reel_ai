@@ -1,11 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/video_comment.dart';
 import '../utils/exceptions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class VideoCommentRepository {
   final FirebaseFirestore _firestore;
   final String _collection = 'comments';
   final String _statsCollection = 'video_stats';
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   VideoCommentRepository({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
@@ -169,15 +171,50 @@ class VideoCommentRepository {
   // Like/Unlike a comment
   Future<void> toggleCommentLike(String commentId, bool like) async {
     try {
-      await _firestore
-          .collection(_collection)
-          .doc(commentId)
-          .update({
-            'likeCount': FieldValue.increment(like ? 1 : -1),
-          });
+      final batch = _firestore.batch();
+      final commentRef = _firestore.collection(_collection).doc(commentId);
+      final likeRef = _firestore.collection('comment_likes').doc('${commentId}_${_auth.currentUser?.uid}');
+
+      if (like) {
+        // Add like document
+        batch.set(likeRef, {
+          'commentId': commentId,
+          'userId': _auth.currentUser?.uid,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+        // Increment like count
+        batch.update(commentRef, {
+          'likeCount': FieldValue.increment(1),
+        });
+      } else {
+        // Remove like document
+        batch.delete(likeRef);
+        // Decrement like count
+        batch.update(commentRef, {
+          'likeCount': FieldValue.increment(-1),
+        });
+      }
+
+      await batch.commit();
     } catch (e) {
       throw VideoException(
         'Failed to toggle comment like: ${e.toString()}',
+        code: VideoException.invalidOperation,
+      );
+    }
+  }
+
+  // Check if user has liked a comment
+  Future<bool> hasUserLikedComment(String commentId, String userId) async {
+    try {
+      final doc = await _firestore
+          .collection('comment_likes')
+          .doc('${commentId}_$userId')
+          .get();
+      return doc.exists;
+    } catch (e) {
+      throw VideoException(
+        'Failed to check comment like: ${e.toString()}',
         code: VideoException.invalidOperation,
       );
     }

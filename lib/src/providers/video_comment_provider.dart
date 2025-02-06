@@ -9,26 +9,21 @@ import 'auth_state.dart';
 
 part 'video_comment_provider.g.dart';
 
-@Riverpod(keepAlive: true)
+@riverpod
 VideoCommentRepository videoCommentRepository(Ref ref) {
   return VideoCommentRepository();
 }
 
-@Riverpod(keepAlive: true)
+@riverpod
 class VideoCommentController extends _$VideoCommentController {
   @override
-  FutureOr<void> build() async {
-    // Initial state is void
-  }
+  FutureOr<void> build() async {}
 
   Future<void> addComment(String videoId, String text, {String? parentCommentId}) async {
     state = const AsyncLoading();
-    
     try {
       final User? user = ref.read(authStateProvider).value;
-      if (user == null) {
-        throw Exception('User must be logged in to comment');
-      }
+      if (user == null) throw Exception('User must be logged in to comment');
 
       final comment = VideoComment(
         id: const Uuid().v4(),
@@ -38,7 +33,6 @@ class VideoCommentController extends _$VideoCommentController {
         timestamp: DateTime.now(),
         parentCommentId: parentCommentId,
         userDisplayName: user.displayName,
-        // TODO: Add user profile image when available
       );
 
       await ref.read(videoCommentRepositoryProvider).addComment(comment);
@@ -51,13 +45,11 @@ class VideoCommentController extends _$VideoCommentController {
 
   Future<void> deleteComment(VideoComment comment) async {
     state = const AsyncLoading();
-    
     try {
       final User? user = ref.read(authStateProvider).value;
       if (user == null || user.id != comment.userId) {
         throw Exception('Unauthorized to delete this comment');
       }
-
       await ref.read(videoCommentRepositoryProvider).deleteComment(comment);
       state = const AsyncData(null);
     } catch (e, stack) {
@@ -66,21 +58,8 @@ class VideoCommentController extends _$VideoCommentController {
     }
   }
 
-  Future<void> updateComment(String commentId, String newText) async {
-    state = const AsyncLoading();
-    
-    try {
-      await ref.read(videoCommentRepositoryProvider).updateComment(commentId, newText);
-      state = const AsyncData(null);
-    } catch (e, stack) {
-      state = AsyncError(e, stack);
-      debugPrint('Error updating comment: $e\n$stack');
-    }
-  }
-
   Future<void> toggleCommentLike(String commentId, bool like) async {
     state = const AsyncLoading();
-    
     try {
       await ref.read(videoCommentRepositoryProvider).toggleCommentLike(commentId, like);
       state = const AsyncData(null);
@@ -91,29 +70,14 @@ class VideoCommentController extends _$VideoCommentController {
   }
 }
 
-// Provider for video comments
 @riverpod
-Stream<List<VideoComment>> videoComments(
-  Ref ref,
-  String videoId, {
-  int limit = 20,
-}) {
-  return ref.watch(videoCommentRepositoryProvider).streamVideoComments(videoId, limit: limit);
+Stream<List<VideoComment>> videoComments(Ref ref, String videoId) {
+  return ref.watch(videoCommentRepositoryProvider).streamVideoComments(videoId);
 }
 
-// Provider for comment replies
 @riverpod
-Future<List<VideoComment>> commentReplies(
-  Ref ref,
-  String commentId, {
-  String? lastReplyId,
-  int limit = 10,
-}) {
-  return ref.watch(videoCommentRepositoryProvider).getCommentReplies(
-    commentId,
-    lastReplyId: lastReplyId,
-    limit: limit,
-  );
+Future<List<VideoComment>> commentReplies(Ref ref, String commentId) {
+  return ref.watch(videoCommentRepositoryProvider).getCommentReplies(commentId);
 }
 
 // Provider for paginated video comments
@@ -129,4 +93,13 @@ Future<List<VideoComment>> paginatedVideoComments(
     lastCommentId: lastCommentId,
     limit: limit,
   );
+}
+
+// Provider to check if user has liked a comment
+@riverpod
+Future<bool> hasUserLikedComment(Ref ref, String commentId) async {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return false;
+  
+  return ref.watch(videoCommentRepositoryProvider).hasUserLikedComment(commentId, user.id);
 } 

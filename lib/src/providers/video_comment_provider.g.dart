@@ -7,12 +7,12 @@ part of 'video_comment_provider.dart';
 // **************************************************************************
 
 String _$videoCommentRepositoryHash() =>
-    r'6448cfe3ed014462bfd78c4d2334748be686673d';
+    r'6a759c4ddc27981d47742e1f839ebae12e025897';
 
 /// See also [videoCommentRepository].
 @ProviderFor(videoCommentRepository)
 final videoCommentRepositoryProvider =
-    Provider<VideoCommentRepository>.internal(
+    AutoDisposeProvider<VideoCommentRepository>.internal(
   videoCommentRepository,
   name: r'videoCommentRepositoryProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
@@ -24,8 +24,9 @@ final videoCommentRepositoryProvider =
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef VideoCommentRepositoryRef = ProviderRef<VideoCommentRepository>;
-String _$videoCommentsHash() => r'e1ea2e775fc80adea9e863f4125f3ea5df27ae93';
+typedef VideoCommentRepositoryRef
+    = AutoDisposeProviderRef<VideoCommentRepository>;
+String _$videoCommentsHash() => r'd3f75e18068fe1ea34d12f14f3920247ecf76d75';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -59,12 +60,10 @@ class VideoCommentsFamily extends Family<AsyncValue<List<VideoComment>>> {
 
   /// See also [videoComments].
   VideoCommentsProvider call(
-    String videoId, {
-    int limit = 20,
-  }) {
+    String videoId,
+  ) {
     return VideoCommentsProvider(
       videoId,
-      limit: limit,
     );
   }
 
@@ -74,7 +73,6 @@ class VideoCommentsFamily extends Family<AsyncValue<List<VideoComment>>> {
   ) {
     return call(
       provider.videoId,
-      limit: provider.limit,
     );
   }
 
@@ -98,13 +96,11 @@ class VideoCommentsProvider
     extends AutoDisposeStreamProvider<List<VideoComment>> {
   /// See also [videoComments].
   VideoCommentsProvider(
-    String videoId, {
-    int limit = 20,
-  }) : this._internal(
+    String videoId,
+  ) : this._internal(
           (ref) => videoComments(
             ref as VideoCommentsRef,
             videoId,
-            limit: limit,
           ),
           from: videoCommentsProvider,
           name: r'videoCommentsProvider',
@@ -116,7 +112,6 @@ class VideoCommentsProvider
           allTransitiveDependencies:
               VideoCommentsFamily._allTransitiveDependencies,
           videoId: videoId,
-          limit: limit,
         );
 
   VideoCommentsProvider._internal(
@@ -127,11 +122,9 @@ class VideoCommentsProvider
     required super.debugGetCreateSourceHash,
     required super.from,
     required this.videoId,
-    required this.limit,
   }) : super.internal();
 
   final String videoId;
-  final int limit;
 
   @override
   Override overrideWith(
@@ -147,7 +140,6 @@ class VideoCommentsProvider
         allTransitiveDependencies: null,
         debugGetCreateSourceHash: null,
         videoId: videoId,
-        limit: limit,
       ),
     );
   }
@@ -159,16 +151,13 @@ class VideoCommentsProvider
 
   @override
   bool operator ==(Object other) {
-    return other is VideoCommentsProvider &&
-        other.videoId == videoId &&
-        other.limit == limit;
+    return other is VideoCommentsProvider && other.videoId == videoId;
   }
 
   @override
   int get hashCode {
     var hash = _SystemHash.combine(0, runtimeType.hashCode);
     hash = _SystemHash.combine(hash, videoId.hashCode);
-    hash = _SystemHash.combine(hash, limit.hashCode);
 
     return _SystemHash.finish(hash);
   }
@@ -179,9 +168,6 @@ class VideoCommentsProvider
 mixin VideoCommentsRef on AutoDisposeStreamProviderRef<List<VideoComment>> {
   /// The parameter `videoId` of this provider.
   String get videoId;
-
-  /// The parameter `limit` of this provider.
-  int get limit;
 }
 
 class _VideoCommentsProviderElement
@@ -191,11 +177,9 @@ class _VideoCommentsProviderElement
 
   @override
   String get videoId => (origin as VideoCommentsProvider).videoId;
-  @override
-  int get limit => (origin as VideoCommentsProvider).limit;
 }
 
-String _$commentRepliesHash() => r'4d63c9121f1c8979878d1c95af92bfab44672f3e';
+String _$commentRepliesHash() => r'10bd2683ededd242440fe3132be7eb56a02c043a';
 
 /// See also [commentReplies].
 @ProviderFor(commentReplies)
@@ -208,14 +192,10 @@ class CommentRepliesFamily extends Family<AsyncValue<List<VideoComment>>> {
 
   /// See also [commentReplies].
   CommentRepliesProvider call(
-    String commentId, {
-    String? lastReplyId,
-    int limit = 10,
-  }) {
+    String commentId,
+  ) {
     return CommentRepliesProvider(
       commentId,
-      lastReplyId: lastReplyId,
-      limit: limit,
     );
   }
 
@@ -225,8 +205,6 @@ class CommentRepliesFamily extends Family<AsyncValue<List<VideoComment>>> {
   ) {
     return call(
       provider.commentId,
-      lastReplyId: provider.lastReplyId,
-      limit: provider.limit,
     );
   }
 
@@ -250,15 +228,11 @@ class CommentRepliesProvider
     extends AutoDisposeFutureProvider<List<VideoComment>> {
   /// See also [commentReplies].
   CommentRepliesProvider(
-    String commentId, {
-    String? lastReplyId,
-    int limit = 10,
-  }) : this._internal(
+    String commentId,
+  ) : this._internal(
           (ref) => commentReplies(
             ref as CommentRepliesRef,
             commentId,
-            lastReplyId: lastReplyId,
-            limit: limit,
           ),
           from: commentRepliesProvider,
           name: r'commentRepliesProvider',
@@ -270,8 +244,6 @@ class CommentRepliesProvider
           allTransitiveDependencies:
               CommentRepliesFamily._allTransitiveDependencies,
           commentId: commentId,
-          lastReplyId: lastReplyId,
-          limit: limit,
         );
 
   CommentRepliesProvider._internal(
@@ -282,13 +254,9 @@ class CommentRepliesProvider
     required super.debugGetCreateSourceHash,
     required super.from,
     required this.commentId,
-    required this.lastReplyId,
-    required this.limit,
   }) : super.internal();
 
   final String commentId;
-  final String? lastReplyId;
-  final int limit;
 
   @override
   Override overrideWith(
@@ -304,8 +272,6 @@ class CommentRepliesProvider
         allTransitiveDependencies: null,
         debugGetCreateSourceHash: null,
         commentId: commentId,
-        lastReplyId: lastReplyId,
-        limit: limit,
       ),
     );
   }
@@ -317,18 +283,13 @@ class CommentRepliesProvider
 
   @override
   bool operator ==(Object other) {
-    return other is CommentRepliesProvider &&
-        other.commentId == commentId &&
-        other.lastReplyId == lastReplyId &&
-        other.limit == limit;
+    return other is CommentRepliesProvider && other.commentId == commentId;
   }
 
   @override
   int get hashCode {
     var hash = _SystemHash.combine(0, runtimeType.hashCode);
     hash = _SystemHash.combine(hash, commentId.hashCode);
-    hash = _SystemHash.combine(hash, lastReplyId.hashCode);
-    hash = _SystemHash.combine(hash, limit.hashCode);
 
     return _SystemHash.finish(hash);
   }
@@ -339,12 +300,6 @@ class CommentRepliesProvider
 mixin CommentRepliesRef on AutoDisposeFutureProviderRef<List<VideoComment>> {
   /// The parameter `commentId` of this provider.
   String get commentId;
-
-  /// The parameter `lastReplyId` of this provider.
-  String? get lastReplyId;
-
-  /// The parameter `limit` of this provider.
-  int get limit;
 }
 
 class _CommentRepliesProviderElement
@@ -354,10 +309,6 @@ class _CommentRepliesProviderElement
 
   @override
   String get commentId => (origin as CommentRepliesProvider).commentId;
-  @override
-  String? get lastReplyId => (origin as CommentRepliesProvider).lastReplyId;
-  @override
-  int get limit => (origin as CommentRepliesProvider).limit;
 }
 
 String _$paginatedVideoCommentsHash() =>
@@ -530,13 +481,144 @@ class _PaginatedVideoCommentsProviderElement
   int get limit => (origin as PaginatedVideoCommentsProvider).limit;
 }
 
+String _$hasUserLikedCommentHash() =>
+    r'654413d55548546a89067c2861c82de55fb9416a';
+
+/// See also [hasUserLikedComment].
+@ProviderFor(hasUserLikedComment)
+const hasUserLikedCommentProvider = HasUserLikedCommentFamily();
+
+/// See also [hasUserLikedComment].
+class HasUserLikedCommentFamily extends Family<AsyncValue<bool>> {
+  /// See also [hasUserLikedComment].
+  const HasUserLikedCommentFamily();
+
+  /// See also [hasUserLikedComment].
+  HasUserLikedCommentProvider call(
+    String commentId,
+  ) {
+    return HasUserLikedCommentProvider(
+      commentId,
+    );
+  }
+
+  @override
+  HasUserLikedCommentProvider getProviderOverride(
+    covariant HasUserLikedCommentProvider provider,
+  ) {
+    return call(
+      provider.commentId,
+    );
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'hasUserLikedCommentProvider';
+}
+
+/// See also [hasUserLikedComment].
+class HasUserLikedCommentProvider extends AutoDisposeFutureProvider<bool> {
+  /// See also [hasUserLikedComment].
+  HasUserLikedCommentProvider(
+    String commentId,
+  ) : this._internal(
+          (ref) => hasUserLikedComment(
+            ref as HasUserLikedCommentRef,
+            commentId,
+          ),
+          from: hasUserLikedCommentProvider,
+          name: r'hasUserLikedCommentProvider',
+          debugGetCreateSourceHash:
+              const bool.fromEnvironment('dart.vm.product')
+                  ? null
+                  : _$hasUserLikedCommentHash,
+          dependencies: HasUserLikedCommentFamily._dependencies,
+          allTransitiveDependencies:
+              HasUserLikedCommentFamily._allTransitiveDependencies,
+          commentId: commentId,
+        );
+
+  HasUserLikedCommentProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.commentId,
+  }) : super.internal();
+
+  final String commentId;
+
+  @override
+  Override overrideWith(
+    FutureOr<bool> Function(HasUserLikedCommentRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: HasUserLikedCommentProvider._internal(
+        (ref) => create(ref as HasUserLikedCommentRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        commentId: commentId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeFutureProviderElement<bool> createElement() {
+    return _HasUserLikedCommentProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is HasUserLikedCommentProvider && other.commentId == commentId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, commentId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+mixin HasUserLikedCommentRef on AutoDisposeFutureProviderRef<bool> {
+  /// The parameter `commentId` of this provider.
+  String get commentId;
+}
+
+class _HasUserLikedCommentProviderElement
+    extends AutoDisposeFutureProviderElement<bool> with HasUserLikedCommentRef {
+  _HasUserLikedCommentProviderElement(super.provider);
+
+  @override
+  String get commentId => (origin as HasUserLikedCommentProvider).commentId;
+}
+
 String _$videoCommentControllerHash() =>
-    r'40d60891caea4e03c25b49204b69df3e18cfa001';
+    r'3340c71c2dbaad23f0786568a83d866890158929';
 
 /// See also [VideoCommentController].
 @ProviderFor(VideoCommentController)
 final videoCommentControllerProvider =
-    AsyncNotifierProvider<VideoCommentController, void>.internal(
+    AutoDisposeAsyncNotifierProvider<VideoCommentController, void>.internal(
   VideoCommentController.new,
   name: r'videoCommentControllerProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
@@ -546,6 +628,6 @@ final videoCommentControllerProvider =
   allTransitiveDependencies: null,
 );
 
-typedef _$VideoCommentController = AsyncNotifier<void>;
+typedef _$VideoCommentController = AutoDisposeAsyncNotifier<void>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

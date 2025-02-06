@@ -48,16 +48,20 @@ class _VideoActionBarState extends ConsumerState<VideoActionBar> with SingleTick
 
   Future<void> _handleLike() async {
     HapticFeedback.mediumImpact();
+    
+    // Start animation regardless of state
     _likeAnimationController.forward().then((_) => _likeAnimationController.reverse());
     
-    final hasLiked = await ref.read(hasUserInteractionProvider(videoId: widget.video.id, type: VideoInteraction.typeLike).future);
     try {
-      if (hasLiked) {
-        await ref.read(videoInteractionControllerProvider.notifier).removeInteraction(
-          widget.video.id,
-          VideoInteraction.typeLike,
-        );
-      } else {
+      final hasLiked = await ref.read(hasUserInteractionProvider(videoId: widget.video.id, type: VideoInteraction.typeLike).future);
+      
+      // Only proceed if the state is different from current
+      await ref.read(videoInteractionControllerProvider.notifier).removeInteraction(
+        widget.video.id,
+        VideoInteraction.typeLike,
+      );
+      
+      if (!hasLiked) {
         await ref.read(videoInteractionControllerProvider.notifier).addInteraction(
           widget.video.id,
           VideoInteraction.typeLike,
