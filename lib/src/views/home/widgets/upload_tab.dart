@@ -1,4 +1,4 @@
-import 'dart:io';
+// import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -14,15 +14,28 @@ class UploadTab extends ConsumerStatefulWidget {
 }
 
 class _UploadTabState extends ConsumerState<UploadTab> {
-  VideoPlayerController? _controller;
-  bool _isInitializing = false;
   final TextEditingController _descriptionController = TextEditingController();
+  String? _lastVideoPath;
 
   @override
   void dispose() {
-    _controller?.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final uploadState = ref.read(videoUploadControllerProvider);
+    final newVideoPath = uploadState.selectedVideo?.path;
+    
+    if (newVideoPath != _lastVideoPath) {
+      _lastVideoPath = newVideoPath;
+      if (newVideoPath != null) {
+        ref.read(videoPlayerControllerNotifierProvider.notifier)
+          .initializeController(uploadState.selectedVideo!);
+      }
+    }
   }
 
   Future<void> _checkAndRequestPermissions() async {
@@ -110,74 +123,42 @@ class _UploadTabState extends ConsumerState<UploadTab> {
     }
   }
 
-  Future<void> _initializeVideo(String path) async {
-    if (_isInitializing) return;
-    _isInitializing = true;
-    
-    try {
-      final oldController = _controller;
-      final newController = VideoPlayerController.file(File(path));
-      
-      await newController.initialize();
-      await oldController?.dispose();
-      
-      if (mounted) {
-        setState(() {
-          _controller = newController;
-          _isInitializing = false;
-        });
-        
-        _controller?.play();
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isInitializing = false;
-        });
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(videoUploadControllerProvider);
-
-    if (state.selectedVideo != null && 
-        (_controller == null || state.selectedVideo!.path != _controller!.dataSource)) {
-      _initializeVideo(state.selectedVideo!.path);
-    }
+    final uploadState = ref.watch(videoUploadControllerProvider);
+    final videoPlayerAsync = ref.watch(videoPlayerControllerNotifierProvider);
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (state.isLoading)
+          if (uploadState.isLoading)
             const LinearProgressIndicator(),
             
-          if (state.isUploading && state.uploadProgress != null)
+          if (uploadState.isUploading && uploadState.uploadProgress != null)
             Column(
               children: [
-                LinearProgressIndicator(value: state.uploadProgress),
+                LinearProgressIndicator(value: uploadState.uploadProgress),
                 const SizedBox(height: 8),
                 Text(
-                  '${(state.uploadProgress! * 100).toStringAsFixed(1)}%',
+                  '${(uploadState.uploadProgress! * 100).toStringAsFixed(1)}%',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
             
-          if (state.error != null)
+          if (uploadState.error != null)
             Container(
               padding: const EdgeInsets.all(8),
               color: Colors.red.shade100,
               child: Text(
-                state.error!,
+                uploadState.error!,
                 style: const TextStyle(color: Colors.red),
               ),
             ),
             
-          if (state.selectedVideo == null)
+          if (uploadState.selectedVideo == null)
             Expanded(
               child: Center(
                 child: Column(
@@ -198,10 +179,16 @@ class _UploadTabState extends ConsumerState<UploadTab> {
               child: Column(
                 children: [
                   AspectRatio(
-                    aspectRatio: _controller?.value.aspectRatio ?? 16/9,
-                    child: _controller?.value.isInitialized ?? false
-                        ? VideoPlayer(_controller!)
-                        : const Center(child: CircularProgressIndicator()),
+                    aspectRatio: videoPlayerAsync.value?.value.aspectRatio ?? 16/9,
+                    child: videoPlayerAsync.when(
+                      data: (controller) => controller != null
+                          ? VideoPlayer(controller)
+                          : const Center(child: Text('No video selected')),
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (error, stack) => Center(
+                        child: Text('Error: $error', style: const TextStyle(color: Colors.red)),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   TextField(
@@ -218,7 +205,7 @@ class _UploadTabState extends ConsumerState<UploadTab> {
                     children: [
                       TextButton.icon(
                         onPressed: () {
-                          _controller?.pause();
+                          _descriptionController.clear();
                           ref.read(videoUploadControllerProvider.notifier)
                             .removeSelectedVideo();
                         },
@@ -226,7 +213,7 @@ class _UploadTabState extends ConsumerState<UploadTab> {
                         label: const Text('Remove'),
                       ),
                       ElevatedButton.icon(
-                        onPressed: state.isUploading
+                        onPressed: uploadState.isUploading
                             ? null
                             : () {
                                 ref.read(videoUploadControllerProvider.notifier)

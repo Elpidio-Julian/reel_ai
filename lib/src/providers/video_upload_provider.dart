@@ -1,53 +1,88 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import '../services/video_service.dart';
 
 part 'video_upload_provider.g.dart';
+part 'video_upload_provider.freezed.dart';
 
-class VideoUploadState {
-  final bool isLoading;
-  final String? error;
-  final File? selectedVideo;
-  final String? description;
-  final bool isUploading;
-  final double? uploadProgress;
-
-  const VideoUploadState({
-    this.isLoading = false,
-    this.error,
-    this.selectedVideo,
-    this.description,
-    this.isUploading = false,
-    this.uploadProgress,
-  });
-
-  VideoUploadState copyWith({
-    bool? isLoading,
+@freezed
+class VideoUploadState with _$VideoUploadState {
+  const factory VideoUploadState({
+    @Default(false) bool isLoading,
     String? error,
     File? selectedVideo,
     String? description,
-    bool? isUploading,
+    @Default(false) bool isUploading,
     double? uploadProgress,
-  }) {
-    return VideoUploadState(
-      isLoading: isLoading ?? this.isLoading,
-      error: error ?? this.error,
-      selectedVideo: selectedVideo ?? this.selectedVideo,
-      description: description ?? this.description,
-      isUploading: isUploading ?? this.isUploading,
-      uploadProgress: uploadProgress ?? this.uploadProgress,
-    );
-  }
+  }) = _VideoUploadState;
 }
 
-@Riverpod(keepAlive: true)
+@riverpod
 VideoService videoService(Ref ref) {
   return VideoService();
 }
 
-@Riverpod(keepAlive: true)
+@riverpod
+class VideoPlayerControllerNotifier extends _$VideoPlayerControllerNotifier {
+  VideoPlayerController? _controller;
+
+  @override
+  FutureOr<VideoPlayerController?> build() async {
+    ref.onDispose(() async {
+      await _controller?.pause();
+      await _controller?.dispose();
+      _controller = null;
+    });
+    return null;
+  }
+
+  Future<void> initializeController(File videoFile) async {
+    state = const AsyncLoading();
+    
+    try {
+      // Dispose old controller if exists
+      if (_controller != null) {
+        await _controller!.pause();
+        await _controller!.dispose();
+        _controller = null;
+      }
+
+      // Create and initialize new controller
+      final controller = VideoPlayerController.file(videoFile);
+      await controller.initialize();
+      _controller = controller;
+      
+      // Update state before playing
+      state = AsyncData(controller);
+      
+      // Start playing after state is updated
+      await controller.play();
+    } catch (e) {
+      if (_controller != null) {
+        await _controller!.dispose();
+        _controller = null;
+      }
+      state = AsyncError(e, StackTrace.current);
+    }
+  }
+
+  Future<void> disposeController() async {
+    state = const AsyncLoading();
+    if (_controller != null) {
+      await _controller!.pause();
+      await _controller!.dispose();
+      _controller = null;
+    }
+    state = const AsyncData(null);
+  }
+}
+
+@riverpod
 class VideoUploadController extends _$VideoUploadController {
   @override
   VideoUploadState build() => const VideoUploadState();
@@ -62,10 +97,14 @@ class VideoUploadController extends _$VideoUploadController {
       );
       
       if (video != null) {
+        final videoFile = File(video.path);
         state = state.copyWith(
-          selectedVideo: File(video.path),
+          selectedVideo: videoFile,
           isLoading: false,
         );
+        // Initialize video player after state update
+        await ref.read(videoPlayerControllerNotifierProvider.notifier)
+          .initializeController(videoFile);
       } else {
         state = state.copyWith(isLoading: false);
       }
@@ -89,12 +128,15 @@ class VideoUploadController extends _$VideoUploadController {
     );
   }
 
-  void setRecordedVideo(File videoFile) {
+  void setRecordedVideo(File videoFile) async {
     state = state.copyWith(
       selectedVideo: videoFile,
       isLoading: false,
       error: null,
     );
+    // Initialize video player after state update
+    await ref.read(videoPlayerControllerNotifierProvider.notifier)
+      .initializeController(videoFile);
   }
 
   Future<void> uploadVideo() async {
@@ -152,11 +194,10 @@ class VideoUploadController extends _$VideoUploadController {
     }
   }
 
-  void removeSelectedVideo() {
-    state = state.copyWith(
-      selectedVideo: null,
-      description: null,
-      error: null,
-    );
+  void removeSelectedVideo() async {
+    // Dispose video player first
+    await ref.read(videoPlayerControllerNotifierProvider.notifier).disposeController();
+    // Then clear state
+    state = const VideoUploadState();
   }
 }
