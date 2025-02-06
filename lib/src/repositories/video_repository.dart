@@ -116,14 +116,35 @@ class VideoRepository {
 
   // Stream user's videos
   Stream<List<Video>> getUserVideosStream(String userId) {
-    return _firestore
-        .collection(_collection)
-        .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => Video.fromMap(doc.data()))
-            .toList());
+    try {
+      return _firestore
+          .collection(_collection)
+          .where('userId', isEqualTo: userId)
+          .orderBy('createdAt', descending: true)
+          .snapshots()
+          .handleError((error) {
+            if (_isIndexBuildingError(error)) {
+              // Fallback to unordered query
+              return _firestore
+                  .collection(_collection)
+                  .where('userId', isEqualTo: userId)
+                  .snapshots();
+            }
+            throw VideoException(
+              'Failed to stream user videos: ${error.toString()}',
+              code: VideoException.indexBuilding
+            );
+          })
+          .map((snapshot) => snapshot.docs
+              .map((doc) => Video.fromMap(doc.data()))
+              .toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt)));
+    } catch (e) {
+      return Stream.error(VideoException(
+        'Failed to create user videos stream: ${e.toString()}',
+        code: VideoException.indexBuilding
+      ));
+    }
   }
 
   // Get videos by status with fallback
@@ -185,26 +206,69 @@ class VideoRepository {
 
   // Stream videos by status
   Stream<List<Video>> getVideosByStatusStream(String status) {
-    return _firestore
-        .collection(_collection)
-        .where('status', isEqualTo: status)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => Video.fromMap(doc.data()))
-            .toList());
+    try {
+      return _firestore
+          .collection(_collection)
+          .where('status', isEqualTo: status)
+          .orderBy('createdAt', descending: true)
+          .snapshots()
+          .handleError((error) {
+            if (_isIndexBuildingError(error)) {
+              // Fallback to unordered query
+              return _firestore
+                  .collection(_collection)
+                  .where('status', isEqualTo: status)
+                  .snapshots();
+            }
+            throw VideoException(
+              'Failed to stream videos by status: ${error.toString()}',
+              code: VideoException.indexBuilding
+            );
+          })
+          .map((snapshot) => snapshot.docs
+              .map((doc) => Video.fromMap(doc.data()))
+              .toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt)));
+    } catch (e) {
+      return Stream.error(VideoException(
+        'Failed to create videos by status stream: ${e.toString()}',
+        code: VideoException.indexBuilding
+      ));
+    }
   }
 
   // Stream user's videos by status
   Stream<List<Video>> getUserVideosByStatusStream(String userId, String status) {
-    return _firestore
-        .collection(_collection)
-        .where('userId', isEqualTo: userId)
-        .where('status', isEqualTo: status)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => Video.fromMap(doc.data()))
-            .toList());
+    try {
+      return _firestore
+          .collection(_collection)
+          .where('userId', isEqualTo: userId)
+          .where('status', isEqualTo: status)
+          .orderBy('createdAt', descending: true)
+          .snapshots()
+          .handleError((error) {
+            if (_isIndexBuildingError(error)) {
+              // Fallback to unordered query
+              return _firestore
+                  .collection(_collection)
+                  .where('userId', isEqualTo: userId)
+                  .where('status', isEqualTo: status)
+                  .snapshots();
+            }
+            throw VideoException(
+              'Failed to stream user videos by status: ${error.toString()}',
+              code: VideoException.indexBuilding
+            );
+          })
+          .map((snapshot) => snapshot.docs
+              .map((doc) => Video.fromMap(doc.data()))
+              .toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt)));
+    } catch (e) {
+      return Stream.error(VideoException(
+        'Failed to create user videos by status stream: ${e.toString()}',
+        code: VideoException.indexBuilding
+      ));
+    }
   }
 } 

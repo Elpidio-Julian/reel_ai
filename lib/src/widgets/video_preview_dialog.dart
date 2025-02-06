@@ -29,7 +29,7 @@ class _VideoPreviewDialogState extends State<VideoPreviewDialog> {
   }
 
   Future<void> _initializeVideo() async {
-    _controller = VideoPlayerController.network(widget.video.url);
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.video.url));
     try {
       await _controller.initialize();
       if (mounted) {
@@ -99,7 +99,7 @@ class _VideoPreviewDialogState extends State<VideoPreviewDialog> {
                           ? Icons.pause
                           : Icons.play_arrow,
                       size: 48,
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withAlpha(204),
                     ),
                     onPressed: () {
                       setState(() {
@@ -135,7 +135,7 @@ class _VideoPreviewDialogState extends State<VideoPreviewDialog> {
                 Text(
                   'Status: ${widget.video.status}',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withAlpha(179),
                     fontSize: 12,
                   ),
                 ),

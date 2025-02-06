@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/video.dart';
 import '../../../providers/gallery_provider.dart';
 import '../../../widgets/video_preview_dialog.dart';
+import '../../../utils/exceptions.dart';
 
 final selectedGalleryTabProvider = StateProvider<int>((ref) => 0);
 
@@ -21,6 +22,10 @@ class _GalleryTabState extends ConsumerState<GalleryTab> with SingleTickerProvid
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_handleTabChange);
+    // Load draft videos initially
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(galleryControllerProvider.notifier).loadDraftVideos();
+    });
   }
 
   void _handleTabChange() {
@@ -46,10 +51,10 @@ class _GalleryTabState extends ConsumerState<GalleryTab> with SingleTickerProvid
       builder: (context) => VideoPreviewDialog(
         video: video,
         onPublish: video.status == Video.statusReady || video.status == Video.statusDraft
-            ? () => ref.read(galleryControllerProvider.notifier).publishVideo(video.id)
+            ? () => ref.read(galleryControllerProvider.notifier).publishVideo(video)
             : null,
         onUnpublish: video.status == Video.statusPublished
-            ? () => ref.read(galleryControllerProvider.notifier).unpublishVideo(video.id)
+            ? () => ref.read(galleryControllerProvider.notifier).unpublishVideo(video)
             : null,
       ),
     );
@@ -95,7 +100,7 @@ class _GalleryTabState extends ConsumerState<GalleryTab> with SingleTickerProvid
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
+                    color: Colors.black.withAlpha(179), // 0.7 opacity
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -129,10 +134,35 @@ class _GalleryTabState extends ConsumerState<GalleryTab> with SingleTickerProvid
         ),
         Expanded(
           child: videos.when(
-            data: (videoList) => _buildVideoGrid(videoList),
+            data: (videoList) => videoList.isEmpty
+                ? const Center(child: Text('No videos found'))
+                : _buildVideoGrid(videoList),
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (error, stack) => Center(
-              child: Text('Error: $error'),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Error loading videos: ${error.toString()}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                    if (error is VideoException && error.code == VideoException.indexBuilding)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8.0),
+                        child: Text(
+                          'Please wait while we set up the video gallery. This may take a few minutes.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontStyle: FontStyle.italic),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

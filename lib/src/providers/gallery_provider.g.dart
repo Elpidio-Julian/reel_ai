@@ -7,7 +7,7 @@ part of 'gallery_provider.dart';
 // **************************************************************************
 
 String _$galleryVideoServiceHash() =>
-    r'f6dfb100a86bbcf0f61f02e0df8beb65c0ac4497';
+    r'18ab2333bfa164bbcc0021bfe2d4b16f57d8ca06';
 
 /// See also [galleryVideoService].
 @ProviderFor(galleryVideoService)
@@ -24,7 +24,7 @@ final galleryVideoServiceProvider = AutoDisposeProvider<VideoService>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef GalleryVideoServiceRef = AutoDisposeProviderRef<VideoService>;
-String _$galleryControllerHash() => r'fb6b276134c94d4829f475bca91553ec21eccd88';
+String _$galleryControllerHash() => r'892b4341f183b57ed1be4694722e40a079321d8a';
 
 /// See also [GalleryController].
 @ProviderFor(GalleryController)

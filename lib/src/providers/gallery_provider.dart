@@ -1,62 +1,80 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../models/video.dart';
 import '../services/video_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 part 'gallery_provider.g.dart';
 
-@riverpod
-VideoService galleryVideoService(GalleryVideoServiceRef ref) {
+@Riverpod(keepAlive: true)
+VideoService galleryVideoService(Ref ref) {
   return VideoService();
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 class GalleryController extends _$GalleryController {
   @override
-  Future<List<Video>> build() async {
-    // Start with draft videos by default
-    return _loadDraftVideos();
-  }
-
-  Future<List<Video>> _loadDraftVideos() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return [];
-    
-    final videoService = ref.read(galleryVideoServiceProvider);
-    return videoService.getUserDraftVideos(user.uid);
-  }
-
-  Future<List<Video>> _loadPublishedVideos() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return [];
-    
-    final videoService = ref.read(galleryVideoServiceProvider);
-    return videoService.getUserPublishedVideos(user.uid);
+  FutureOr<List<Video>> build() async {
+    debugPrint('GalleryController: Initial build');
+    return [];
   }
 
   Future<void> loadDraftVideos() async {
+    debugPrint('GalleryController: Loading draft videos');
     state = const AsyncLoading();
-    state = await AsyncValue.guard(_loadDraftVideos);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      debugPrint('GalleryController: Current user: ${user?.uid}');
+      if (user == null) {
+        debugPrint('GalleryController: No user logged in');
+        state = const AsyncData([]);
+        return;
+      }
+      final videos = await ref.read(galleryVideoServiceProvider).getUserDraftVideos(user.uid);
+      debugPrint('GalleryController: Loaded ${videos.length} draft videos');
+      state = AsyncData(videos);
+    } catch (e, stack) {
+      debugPrint('GalleryController: Error loading draft videos: $e\n$stack');
+      state = AsyncError(e, stack);
+    }
   }
 
   Future<void> loadPublishedVideos() async {
+    debugPrint('GalleryController: Loading published videos');
     state = const AsyncLoading();
-    state = await AsyncValue.guard(_loadPublishedVideos);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      debugPrint('GalleryController: Current user: ${user?.uid}');
+      if (user == null) {
+        debugPrint('GalleryController: No user logged in');
+        state = const AsyncData([]);
+        return;
+      }
+      final videos = await ref.read(galleryVideoServiceProvider).getUserPublishedVideos(user.uid);
+      debugPrint('GalleryController: Loaded ${videos.length} published videos');
+      state = AsyncData(videos);
+    } catch (e, stack) {
+      debugPrint('GalleryController: Error loading published videos: $e\n$stack');
+      state = AsyncError(e, stack);
+    }
   }
 
-  Future<void> publishVideo(String videoId) async {
-    final videoService = ref.read(galleryVideoServiceProvider);
-    await videoService.publishVideo(videoId);
-    // Reload the current list
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(_loadDraftVideos);
+  Future<void> publishVideo(Video video) async {
+    try {
+      await ref.read(galleryVideoServiceProvider).publishVideo(video.id);
+      await loadDraftVideos();
+    } catch (e) {
+      state = AsyncError(e, StackTrace.current);
+    }
   }
 
-  Future<void> unpublishVideo(String videoId) async {
-    final videoService = ref.read(galleryVideoServiceProvider);
-    await videoService.unpublishVideo(videoId);
-    // Reload the current list
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(_loadPublishedVideos);
+  Future<void> unpublishVideo(Video video) async {
+    try {
+      await ref.read(galleryVideoServiceProvider).unpublishVideo(video.id);
+      await loadPublishedVideos();
+    } catch (e) {
+      state = AsyncError(e, StackTrace.current);
+    }
   }
 } 

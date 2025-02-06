@@ -104,7 +104,7 @@ class VideoService {
       // Update video with URL and status
       final updatedVideo = video.copyWith(
         url: downloadUrl,
-        status: 'ready',
+        status: Video.statusDraft,
       );
 
       // Update video metadata
