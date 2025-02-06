@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../widgets/permission_manager.dart';
+// import '../../../services/permission_service.dart';
 import '../../../providers/auth_state.dart';
+import '../../../providers/permission_provider.dart';
+import '../../../routes.dart';
 
 class ProfileTab extends ConsumerWidget {
   const ProfileTab({super.key});
 
-  void _showPermissionManager(BuildContext context) {
+  void _showAppSettings(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -26,7 +28,7 @@ class ProfileTab extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'App Permissions',
+                    'App Settings',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -41,9 +43,75 @@ class ProfileTab extends ConsumerWidget {
             ),
             const Divider(),
             Expanded(
-              child: SingleChildScrollView(
+              child: ListView(
                 controller: scrollController,
-                child: const PermissionManager(),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  // App Permissions Section
+                  const Text(
+                    'App Permissions',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ListTile(
+                    leading: const Icon(Icons.settings_applications),
+                    title: const Text('System Settings'),
+                    subtitle: const Text('Manage app permissions in Android settings'),
+                    trailing: const Icon(Icons.open_in_new),
+                    onTap: () {
+                      ref.read(permissionNotifierProvider.notifier).openSettings();
+                    },
+                  ),
+                  const Divider(),
+
+                  // Storage Section
+                  const Text(
+                    'Storage & Data',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ListTile(
+                    leading: const Icon(Icons.cleaning_services),
+                    title: const Text('Clear Cache'),
+                    subtitle: const Text('Free up space by clearing cached media'),
+                    onTap: () {
+                      // TODO: Implement cache clearing
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Coming soon: Clear Cache')),
+                      );
+                    },
+                  ),
+                  const Divider(),
+
+                  // Media Settings
+                  const Text(
+                    'Media Settings',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ListTile(
+                    leading: const Icon(Icons.high_quality),
+                    title: const Text('Video Quality'),
+                    subtitle: const Text('Manage recording and playback quality'),
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Coming soon: Video Quality Settings')),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
           ],
@@ -53,8 +121,40 @@ class ProfileTab extends ConsumerWidget {
   }
 
   Future<void> _handleSignOut(BuildContext context, WidgetRef ref) async {
+    // Show confirmation dialog
+    final shouldSignOut = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Sign Out'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldSignOut != true) return;
+
     try {
       await ref.read(authStateProvider.notifier).signOut();
+      if (context.mounted) {
+        // Navigate to login screen after successful sign out
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          Routes.login,
+          (route) => false, // Clear all routes
+        );
+      }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -102,15 +202,14 @@ class ProfileTab extends ConsumerWidget {
               ListTile(
                 leading: const Icon(Icons.edit),
                 title: const Text('Edit Profile'),
-                onTap: () {
-                  // TODO: Navigate to edit profile
-                },
+                onTap: () => Navigator.pushNamed(context, Routes.editProfile),
               ),
               const Divider(),
               ListTile(
-                leading: const Icon(Icons.security),
-                title: const Text('App Permissions'),
-                onTap: () => _showPermissionManager(context),
+                leading: const Icon(Icons.settings),
+                title: const Text('App Settings'),
+                subtitle: const Text('Permissions, storage, and more'),
+                onTap: () => _showAppSettings(context, ref),
               ),
               const Divider(),
               ListTile(
